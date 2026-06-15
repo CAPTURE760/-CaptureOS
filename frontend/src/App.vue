@@ -31,7 +31,7 @@
             <span>故障案例</span>
           </el-menu-item>
           <el-menu-item index="/labs">
-            <el-icon><Flask /></el-icon>
+            <el-icon><MagicStick /></el-icon>
             <span>实验室</span>
           </el-menu-item>
           <el-menu-item index="/knowledge">
