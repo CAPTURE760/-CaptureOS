@@ -1,183 +1,79 @@
 <template>
-  <div class="login-container">
-    <n-card class="login-card">
-      <div class="logo-area">
-        <div class="logo-icon">C</div>
-        <h1 class="logo-title">CaptureOS</h1>
-        <p class="logo-subtitle">个人职业资产管理系统</p>
+  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)">
+    <div style="width: 420px; background: #161b22; border: 1px solid rgba(233,69,96,0.2); border-radius: 16px; padding: 40px">
+      <div style="text-align: center; margin-bottom: 24px">
+        <div style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #e94560, #c0392b); display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 700; color: #fff; margin: 0 auto 12px">C</div>
+        <h1 style="font-size: 28px; font-weight: 700; color: #e0e0e0; margin-bottom: 4px">CaptureOS</h1>
+        <p style="font-size: 14px; color: #8b949e">个人职业资产管理系统</p>
       </div>
 
-      <n-tabs v-model:value="activeTab" animated>
-        <n-tab-pane name="login" tab="登录">
-          <n-form ref="loginFormRef" :model="loginForm" :rules="loginRules">
-            <n-form-item path="username" label="用户名">
-              <n-input
-                v-model:value="loginForm.username"
-                placeholder="请输入用户名"
-                @keyup.enter="handleLogin"
-              />
-            </n-form-item>
-            <n-form-item path="password" label="密码">
-              <n-input
-                v-model:value="loginForm.password"
-                type="password"
-                show-password-on="click"
-                placeholder="请输入密码"
-                @keyup.enter="handleLogin"
-              />
-            </n-form-item>
-            <n-button
-              type="primary"
-              block
-              :loading="loading"
-              @click="handleLogin"
-            >
-              登录
-            </n-button>
-          </n-form>
-        </n-tab-pane>
+      <div style="display: flex; gap: 16px; margin-bottom: 24px">
+        <div @click="mode = 'login'" :style="{ flex: 1, textAlign: 'center', padding: '10px', cursor: 'pointer', borderBottom: mode === 'login' ? '2px solid #e94560' : '2px solid transparent', color: mode === 'login' ? '#e94560' : '#a0aec0' }">登录</div>
+        <div @click="mode = 'register'" :style="{ flex: 1, textAlign: 'center', padding: '10px', cursor: 'pointer', borderBottom: mode === 'register' ? '2px solid #e94560' : '2px solid transparent', color: mode === 'register' ? '#e94560' : '#a0aec0' }">注册</div>
+      </div>
 
-        <n-tab-pane name="register" tab="注册">
-          <n-form ref="registerFormRef" :model="registerForm" :rules="registerRules">
-            <n-form-item path="username" label="用户名">
-              <n-input
-                v-model:value="registerForm.username"
-                placeholder="请输入用户名"
-                @keyup.enter="handleRegister"
-              />
-            </n-form-item>
-            <n-form-item path="password" label="密码">
-              <n-input
-                v-model:value="registerForm.password"
-                type="password"
-                show-password-on="click"
-                placeholder="请输入密码"
-                @keyup.enter="handleRegister"
-              />
-            </n-form-item>
-            <n-button
-              type="primary"
-              block
-              :loading="loading"
-              @click="handleRegister"
-            >
-              注册
-            </n-button>
-          </n-form>
-        </n-tab-pane>
-      </n-tabs>
-    </n-card>
+      <div v-if="mode === 'login'">
+        <input v-model="loginForm.username" placeholder="用户名" style="width: 100%; padding: 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0; margin-bottom: 16px; font-size: 14px" />
+        <input v-model="loginForm.password" type="password" placeholder="密码" style="width: 100%; padding: 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0; margin-bottom: 24px; font-size: 14px" @keyup.enter="handleLogin" />
+        <button @click="handleLogin" :disabled="loading" style="width: 100%; padding: 12px; background: #e94560; border: none; border-radius: 8px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer">{{ loading ? '登录中...' : '登录' }}</button>
+      </div>
+
+      <div v-else>
+        <input v-model="regForm.username" placeholder="用户名" style="width: 100%; padding: 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0; margin-bottom: 16px; font-size: 14px" />
+        <input v-model="regForm.password" type="password" placeholder="密码" style="width: 100%; padding: 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0; margin-bottom: 24px; font-size: 14px" @keyup.enter="handleRegister" />
+        <button @click="handleRegister" :disabled="loading" style="width: 100%; padding: 12px; background: #e94560; border: none; border-radius: 8px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer">{{ loading ? '注册中...' : '注册' }}</button>
+      </div>
+
+      <p v-if="error" style="color: #e94560; text-align: center; margin-top: 16px; font-size: 14px">{{ error }}</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  NCard, NTabs, NTabPane, NForm, NFormItem,
-  NInput, NButton, useMessage,
-} from 'naive-ui'
-import type { FormInst, FormRules } from 'naive-ui'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
-const message = useMessage()
 const userStore = useUserStore()
 
-const activeTab = ref('login')
+const mode = ref('login')
 const loading = ref(false)
-
-const loginFormRef = ref<FormInst | null>(null)
-const registerFormRef = ref<FormInst | null>(null)
-
+const error = ref('')
 const loginForm = ref({ username: '', password: '' })
-const registerForm = ref({ username: '', password: '' })
-
-const loginRules: FormRules = {
-  username: { required: true, message: '请输入用户名', trigger: 'blur' },
-  password: { required: true, message: '请输入密码', trigger: 'blur' },
-}
-
-const registerRules: FormRules = {
-  username: { required: true, message: '请输入用户名', trigger: 'blur' },
-  password: { required: true, message: '请输入密码', trigger: 'blur' },
-}
+const regForm = ref({ username: '', password: '' })
 
 async function handleLogin() {
+  if (!loginForm.value.username || !loginForm.value.password) {
+    error.value = '请输入用户名和密码'
+    return
+  }
+  loading.value = true
+  error.value = ''
   try {
-    await loginFormRef.value?.validate()
-    loading.value = true
     await userStore.login(loginForm.value.username, loginForm.value.password)
-    message.success('登录成功')
     router.push('/')
-  } catch (err: any) {
-    if (err?.message) {
-      message.error(err.message || '登录失败')
-    }
+  } catch (e: any) {
+    error.value = e?.response?.data?.message || e?.message || '登录失败'
   } finally {
     loading.value = false
   }
 }
 
 async function handleRegister() {
+  if (!regForm.value.username || !regForm.value.password) {
+    error.value = '请输入用户名和密码'
+    return
+  }
+  loading.value = true
+  error.value = ''
   try {
-    await registerFormRef.value?.validate()
-    loading.value = true
-    await userStore.register(registerForm.value.username, registerForm.value.password)
-    message.success('注册成功')
+    await userStore.register(regForm.value.username, regForm.value.password)
     router.push('/')
-  } catch (err: any) {
-    if (err?.message) {
-      message.error(err.message || '注册失败')
-    }
+  } catch (e: any) {
+    error.value = e?.response?.data?.message || e?.message || '注册失败'
   } finally {
     loading.value = false
   }
 }
 </script>
-
-<style scoped>
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-}
-
-.login-card {
-  width: 420px;
-  border-radius: 12px;
-}
-
-.logo-area {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.logo-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #e94560, #c0392b);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: 700;
-  color: #fff;
-  margin: 0 auto 12px;
-}
-
-.logo-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #e0e0e0;
-  margin-bottom: 4px;
-}
-
-.logo-subtitle {
-  font-size: 14px;
-  color: #8b949e;
-}
-</style>
