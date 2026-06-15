@@ -51,17 +51,35 @@ docker compose up -d --build
 
 ### 本地开发
 
-#### 后端
+> 需要 Python 3.10+ 和 Node.js 18+
 
-```bash
+#### Windows (PowerShell)
+
+```powershell
+# 后端
 cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
+
+# 前端（另开一个终端）
+cd frontend
+npm install
+npm run dev
 ```
 
-#### 前端
+#### Linux / macOS
 
 ```bash
+# 后端
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+
+# 前端（另开一个终端）
 cd frontend
 npm install
 npm run dev
