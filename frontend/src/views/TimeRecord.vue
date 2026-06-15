@@ -9,6 +9,7 @@
         <div>
           <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">日期</label>
           <input v-model="form.date" type="date" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0" />
+          <div v-if="errors.date" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.date }}</div>
         </div>
         <div>
           <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">工作(h)</label>
@@ -34,8 +35,15 @@
       </div>
     </div>
 
+    <!-- 加载中 -->
+    <div v-if="loading" style="text-align: center; padding: 40px; color: #a0aec0">
+      <div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite"></div>
+      <div style="margin-top: 8px">加载中...</div>
+    </div>
+    <div v-else-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
+
     <!-- 表格 -->
-    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
+    <div v-else class="table-wrapper" style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
       <table style="width: 100%; border-collapse: collapse">
         <thead>
           <tr style="background: #1a1a2e">
@@ -62,8 +70,6 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="loading" style="text-align: center; padding: 40px; color: #a0aec0"><div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite"></div><div style="margin-top: 8px">加载中...</div></div>
-      <div v-else-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
     </div>
 
     <!-- 分页 -->
@@ -85,6 +91,7 @@ const list = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
+const errors = ref<Record<string, string>>({})
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -95,6 +102,12 @@ const form = ref({
   otherHours: 0,
 })
 
+function validate(): boolean {
+  errors.value = {}
+  if (!form.value.date) errors.value.date = '请选择日期'
+  return Object.keys(errors.value).length === 0
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -104,17 +117,14 @@ async function loadData() {
     list.value = d.items ?? d ?? []
     total.value = d.total ?? 0
   } catch (err: any) {
-    alert(err?.data?.message || '加载失败')
+    // 加载失败静默处理
   } finally {
     loading.value = false
   }
 }
 
 async function handleSave() {
-  if (!form.value.date) {
-    alert('请选择日期')
-    return
-  }
+  if (!validate()) return
   saving.value = true
   try {
     await timeRecordsApi.create(form.value)
@@ -126,9 +136,10 @@ async function handleSave() {
       entertainmentHours: 0,
       otherHours: 0,
     }
+    errors.value = {}
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '保存失败')
+    // 保存失败静默处理
   } finally {
     saving.value = false
   }
@@ -140,7 +151,7 @@ async function handleDelete(id: number | string) {
     await timeRecordsApi.remove(id)
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '删除失败')
+    // 删除失败静默处理
   }
 }
 

@@ -7,8 +7,15 @@
       <button @click="openDialog()" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">新增记录</button>
     </div>
 
+    <!-- 加载中 -->
+    <div v-if="loading" style="text-align: center; padding: 40px; color: #a0aec0">
+      <div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite"></div>
+      <div style="margin-top: 8px">加载中...</div>
+    </div>
+    <div v-else-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
+
     <!-- 表格 -->
-    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
+    <div v-else class="table-wrapper" style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
       <table style="width: 100%; border-collapse: collapse">
         <thead>
           <tr style="background: #1a1a2e">
@@ -33,8 +40,6 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="loading" style="text-align: center; padding: 40px; color: #a0aec0"><div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite"></div><div style="margin-top: 8px">加载中...</div></div>
-      <div v-else-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
     </div>
 
     <!-- 分页 -->
@@ -52,6 +57,7 @@
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">日期 *</label>
             <input v-model="form.date" type="date" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+            <div v-if="errors.date" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.date }}</div>
           </div>
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">资产类型 *</label>
@@ -64,10 +70,12 @@
               <option value="project">项目</option>
               <option value="other">其他</option>
             </select>
+            <div v-if="errors.assetType" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.assetType }}</div>
           </div>
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">内容 *</label>
             <textarea v-model="form.content" placeholder="今日记录内容" rows="3" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+            <div v-if="errors.content" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.content }}</div>
           </div>
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">收获</label>
@@ -98,6 +106,7 @@ const list = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
+const errors = ref<Record<string, string>>({})
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -106,6 +115,14 @@ const form = ref({
   gain: '',
   problem: '',
 })
+
+function validate(): boolean {
+  errors.value = {}
+  if (!form.value.date) errors.value.date = '请选择日期'
+  if (!form.value.assetType) errors.value.assetType = '请选择资产类型'
+  if (!form.value.content?.trim()) errors.value.content = '请输入内容'
+  return Object.keys(errors.value).length === 0
+}
 
 async function loadData() {
   loading.value = true
@@ -116,13 +133,14 @@ async function loadData() {
     list.value = d.items ?? d ?? []
     total.value = d.total ?? 0
   } catch (err: any) {
-    alert(err?.data?.message || '加载失败')
+    // 加载失败静默处理
   } finally {
     loading.value = false
   }
 }
 
 function openDialog() {
+  errors.value = {}
   form.value = {
     date: new Date().toISOString().split('T')[0],
     assetType: '',
@@ -134,25 +152,14 @@ function openDialog() {
 }
 
 async function handleSave() {
-  if (!form.value.date) {
-    alert('请选择日期')
-    return
-  }
-  if (!form.value.assetType) {
-    alert('请选择资产类型')
-    return
-  }
-  if (!form.value.content.trim()) {
-    alert('请输入内容')
-    return
-  }
+  if (!validate()) return
   saving.value = true
   try {
     await dailyLogsApi.create(form.value)
     showDialog.value = false
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '保存失败')
+    // 保存失败静默处理
   } finally {
     saving.value = false
   }
@@ -164,7 +171,7 @@ async function handleDelete(id: number | string) {
     await dailyLogsApi.remove(id)
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '删除失败')
+    // 删除失败静默处理
   }
 }
 
