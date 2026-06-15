@@ -23,7 +23,7 @@ app.get('/', (c) => {
   const limit = Math.min(Number(c.req.query('limit') || 20), 100)
   const search = c.req.query('search')
 
-  let where = 'WHERE user_id = ?'
+  let where = 'WHERE user_id = ? AND deleted_at IS NULL'
   const params: any[] = [userId]
   if (search) {
     where += ' AND name LIKE ?'
@@ -73,14 +73,25 @@ app.put('/:id', async (c) => {
   return c.json(ok(toCamel(item)))
 })
 
-// 删除
+// 删除（软删除）
 app.delete('/:id', (c) => {
   const userId = c.get('userId') as number
   const id = Number(c.req.param('id'))
-  const existing = db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?').get(id, userId)
+  const existing = db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ? AND deleted_at IS NULL').get(id, userId)
   if (!existing) return c.json(fail('记录不存在'), 404)
-  db.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?').run(id, userId)
+  db.prepare("UPDATE projects SET deleted_at = datetime('now', '+8 hours') WHERE id = ? AND user_id = ?").run(id, userId)
   return c.json(ok(null, '删除成功'))
+})
+
+// 恢复软删除记录
+app.post('/:id/restore', (c) => {
+  const userId = c.get('userId') as number
+  const id = Number(c.req.param('id'))
+  const existing = db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL').get(id, userId)
+  if (!existing) return c.json(fail('记录不存在或未被删除'), 404)
+  db.prepare('UPDATE projects SET deleted_at = NULL WHERE id = ? AND user_id = ?').run(id, userId)
+  const item = db.prepare('SELECT * FROM projects WHERE id = ?').get(id)
+  return c.json(ok(toCamel(item), '恢复成功'))
 })
 
 export default app

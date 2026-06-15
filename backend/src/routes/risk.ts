@@ -8,9 +8,17 @@ app.use('*', authMiddleware)
 
 function calcStagnation(lastActivity: string | null): number {
   if (!lastActivity) return 999
-  const last = new Date(lastActivity.replace(' ', 'T'))
-  const now = new Date()
-  return Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
+  // created_at 是 UTC 时间，需要加 8 小时转换为北京时间
+  const lastUtc = new Date(lastActivity.replace(' ', 'T') + 'Z')
+  const lastBeijing = new Date(lastUtc.getTime() + 8 * 60 * 60 * 1000)
+  const nowUtc = Date.now()
+  const nowBeijing = new Date(nowUtc + 8 * 60 * 60 * 1000)
+  // 比较日期部分（不含时间）
+  const lastDateStr = lastBeijing.toISOString().slice(0, 10)
+  const nowDateStr = nowBeijing.toISOString().slice(0, 10)
+  const lastDate = new Date(lastDateStr)
+  const nowDate = new Date(nowDateStr)
+  return Math.floor((nowDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function riskLevel(days: number): string {
@@ -20,8 +28,8 @@ function riskLevel(days: number): string {
   return '红色预警'
 }
 
-const assetTableNames = ['work_cases', 'fault_cases', 'labs', 'knowledge_cards', 'projects'] as const
-const assetLabels = ['workCases', 'faultCases', 'labs', 'knowledgeCards', 'projects'] as const
+const assetTableNames = ['work_cases', 'fault_cases', 'knowledge_cards', 'projects'] as const
+const assetLabels = ['workCases', 'faultCases', 'knowledgeCards', 'projects'] as const
 
 // GET /status
 app.get('/status', (c) => {

@@ -18,7 +18,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS work_cases (
@@ -32,8 +32,9 @@ db.exec(`
     solution TEXT NOT NULL,
     cost_time TEXT,
     tags TEXT DEFAULT '[]',
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    deleted_at TEXT DEFAULT NULL
   );
 
   CREATE TABLE IF NOT EXISTS fault_cases (
@@ -46,22 +47,9 @@ db.exec(`
     solution TEXT NOT NULL,
     prevention TEXT,
     tags TEXT DEFAULT '[]',
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')) NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS labs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    title TEXT NOT NULL,
-    goal TEXT NOT NULL,
-    environment TEXT,
-    steps TEXT,
-    result TEXT,
-    pitfalls TEXT,
-    summary TEXT,
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    deleted_at TEXT DEFAULT NULL
   );
 
   CREATE TABLE IF NOT EXISTS knowledge_cards (
@@ -71,8 +59,9 @@ db.exec(`
     answer TEXT NOT NULL,
     scenario TEXT,
     category TEXT,
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    deleted_at TEXT DEFAULT NULL
   );
 
   CREATE TABLE IF NOT EXISTS projects (
@@ -84,8 +73,9 @@ db.exec(`
     status TEXT DEFAULT '进行中',
     version TEXT,
     next_plan TEXT,
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    deleted_at TEXT DEFAULT NULL
   );
 
   CREATE TABLE IF NOT EXISTS daily_logs (
@@ -96,7 +86,8 @@ db.exec(`
     content TEXT,
     gain TEXT,
     problem TEXT,
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    deleted_at TEXT DEFAULT NULL
   );
 
   CREATE TABLE IF NOT EXISTS time_records (
@@ -108,7 +99,8 @@ db.exec(`
     project_hours REAL DEFAULT 0,
     entertainment_hours REAL DEFAULT 0,
     other_hours REAL DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    deleted_at TEXT DEFAULT NULL
   );
 
   CREATE TABLE IF NOT EXISTS timeline_events (
@@ -118,8 +110,23 @@ db.exec(`
     event_date TEXT NOT NULL,
     event_type TEXT,
     description TEXT,
-    created_at TEXT DEFAULT (datetime('now')) NOT NULL
+    created_at TEXT DEFAULT (datetime('now', '+8 hours')) NOT NULL,
+    deleted_at TEXT DEFAULT NULL
   );
 `)
+
+// 迁移：为已有表添加 deleted_at 列（如果不存在）
+const tables = ['work_cases', 'fault_cases', 'knowledge_cards', 'projects', 'daily_logs', 'time_records', 'timeline_events']
+for (const table of tables) {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c: any) => c.name)
+    if (!cols.includes('deleted_at')) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN deleted_at TEXT DEFAULT NULL`)
+      console.log(`✅ 迁移: ${table} 表已添加 deleted_at 列`)
+    }
+  } catch (err: any) {
+    console.error(`❌ 迁移失败 ${table}:`, err.message)
+  }
+}
 
 export { db }

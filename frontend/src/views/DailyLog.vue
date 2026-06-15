@@ -4,6 +4,8 @@
 
     <!-- 搜索栏 -->
     <div style="display: flex; gap: 12px; margin-bottom: 20px">
+      <input v-model="search" @keyup.enter="loadData()" placeholder="搜索内容、类型、收获、问题..." style="flex: 1; padding: 8px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0" />
+      <button @click="loadData()" style="padding: 8px 16px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #a0aec0; cursor: pointer">搜索</button>
       <button @click="openDialog()" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">新增记录</button>
     </div>
 
@@ -19,7 +21,7 @@
       <table style="width: 100%; border-collapse: collapse">
         <thead>
           <tr style="background: #1a1a2e">
-            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">日期</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">日期时间</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">类型</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">内容</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">收获</th>
@@ -29,12 +31,13 @@
         </thead>
         <tbody>
           <tr v-for="item in list" :key="item.id" style="border-bottom: 1px solid rgba(255,255,255,0.06)">
-            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.date }}</td>
-            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.assetType }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ formatDateTime(item.date) }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ typeMap[item.assetType] || item.assetType }}</td>
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.content }}</td>
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.gain }}</td>
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.problem }}</td>
             <td style="padding: 12px 16px">
+              <button @click="openDialog(item)" style="background: none; border: none; color: #64b5f6; cursor: pointer; margin-right: 8px">编辑</button>
               <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer">删除</button>
             </td>
           </tr>
@@ -52,11 +55,11 @@
     <!-- 弹窗 -->
     <div v-if="showDialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000">
       <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 24px; width: 600px; max-height: 80vh; overflow-y: auto">
-        <h3 style="color: #e0e0e0; margin-bottom: 20px">新增今日记录</h3>
+        <h3 style="color: #e0e0e0; margin-bottom: 20px">{{ editId ? '编辑今日记录' : '新增今日记录' }}</h3>
         <div style="display: flex; flex-direction: column; gap: 16px">
           <div>
-            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">日期 *</label>
-            <input v-model="form.date" type="date" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">日期时间 *</label>
+            <input v-model="form.date" type="datetime-local" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
             <div v-if="errors.date" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.date }}</div>
           </div>
           <div>
@@ -65,7 +68,6 @@
               <option value="">请选择</option>
               <option value="work_case">工作案例</option>
               <option value="fault_case">故障案例</option>
-              <option value="lab">实验</option>
               <option value="knowledge">知识</option>
               <option value="project">项目</option>
               <option value="other">其他</option>
@@ -98,10 +100,32 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { dailyLogsApi } from '../api'
+import { beijingNow } from '../utils/time'
+
+const typeMap: Record<string, string> = {
+  work_case: '工作案例',
+  fault_case: '故障案例',
+  lab: '实验',
+  knowledge: '知识',
+  project: '项目',
+  other: '其他',
+}
+
+function formatDateTime(val: string) {
+  if (!val) return ''
+  // 支持 YYYY-MM-DDTHH:mm 和 YYYY-MM-DD 两种格式
+  const d = val.replace('T', ' ')
+  // 如果只有日期部分，补 00:00
+  if (d.length === 10) return d + ' 00:00'
+  // 只显示到分钟，去掉秒
+  return d.slice(0, 16)
+}
 
 const loading = ref(false)
 const saving = ref(false)
 const showDialog = ref(false)
+const editId = ref<number | null>(null)
+const search = ref('')
 const list = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -109,7 +133,7 @@ const pageSize = 20
 const errors = ref<Record<string, string>>({})
 
 const form = ref({
-  date: new Date().toISOString().split('T')[0],
+  date: beijingNow(),
   assetType: '',
   content: '',
   gain: '',
@@ -128,6 +152,7 @@ async function loadData() {
   loading.value = true
   try {
     const params: any = { skip: (page.value - 1) * pageSize, limit: pageSize }
+    if (search.value) params.search = search.value
     const res = await dailyLogsApi.list(params) as any
     const d = res.data ?? res
     list.value = d.items ?? d ?? []
@@ -139,14 +164,26 @@ async function loadData() {
   }
 }
 
-function openDialog() {
+function openDialog(item?: any) {
   errors.value = {}
-  form.value = {
-    date: new Date().toISOString().split('T')[0],
-    assetType: '',
-    content: '',
-    gain: '',
-    problem: '',
+  if (item) {
+    editId.value = item.id
+    form.value = {
+      date: item.date?.slice(0, 16) || beijingNow(),
+      assetType: item.assetType || '',
+      content: item.content || '',
+      gain: item.gain || '',
+      problem: item.problem || '',
+    }
+  } else {
+    editId.value = null
+    form.value = {
+      date: beijingNow(),
+      assetType: '',
+      content: '',
+      gain: '',
+      problem: '',
+    }
   }
   showDialog.value = true
 }
@@ -155,18 +192,22 @@ async function handleSave() {
   if (!validate()) return
   saving.value = true
   try {
-    await dailyLogsApi.create(form.value)
+    if (editId.value) {
+      await dailyLogsApi.update(editId.value, form.value)
+    } else {
+      await dailyLogsApi.create(form.value)
+    }
     showDialog.value = false
     loadData()
   } catch (err: any) {
-    // 保存失败静默处理
+    alert('保存失败: ' + (err?.response?.data?.message || err?.message || '未知错误'))
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
-  if (!confirm('确认删除？')) return
+  if (!confirm('⚠️ 确认删除此记录？\n\n删除后数据将被隐藏，如需恢复请联系管理员。')) return
   try {
     await dailyLogsApi.remove(id)
     loadData()

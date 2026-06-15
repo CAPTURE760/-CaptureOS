@@ -39,21 +39,6 @@ export const faultCases = sqliteTable('fault_cases', {
   updatedAt: text('updated_at').default('datetime("now")').notNull(),
 })
 
-// ==================== 实验记录 ====================
-export const labs = sqliteTable('labs', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  userId: integer('user_id').notNull().references(() => users.id),
-  title: text('title').notNull(),
-  goal: text('goal').notNull(),
-  environment: text('environment'),
-  steps: text('steps'),
-  result: text('result'),
-  pitfalls: text('pitfalls'),
-  summary: text('summary'),
-  createdAt: text('created_at').default('datetime("now")').notNull(),
-  updatedAt: text('updated_at').default('datetime("now")').notNull(),
-})
-
 // ==================== 知识卡片 ====================
 export const knowledgeCards = sqliteTable('knowledge_cards', {
   id: integer('id').primaryKey({ autoIncrement: true }),

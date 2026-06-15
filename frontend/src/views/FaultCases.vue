@@ -3,8 +3,12 @@
     <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">故障案例</h2>
 
     <!-- 搜索栏 -->
-    <div style="display: flex; gap: 12px; margin-bottom: 20px">
+    <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap">
       <input v-model="search" placeholder="搜索..." style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; width: 200px" @keyup.enter="loadData" />
+      <select v-model="filterTag" @change="loadData()" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0">
+        <option value="">所有标签</option>
+        <option v-for="tag in availableTags" :key="tag" :value="tag">{{ tag }}</option>
+      </select>
       <button @click="loadData" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">搜索</button>
       <button @click="openDialog()" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">新增</button>
     </div>
@@ -25,6 +29,7 @@
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">环境</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">症状</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">根因</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">创建时间</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">操作</th>
           </tr>
         </thead>
@@ -34,6 +39,7 @@
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.environment }}</td>
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.symptom }}</td>
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.rootCause }}</td>
+            <td style="padding: 12px 16px; color: #a0aec0; font-size: 13px">{{ formatDateTime(item.createdAt) }}</td>
             <td style="padding: 12px 16px">
               <button @click="openDialog(item)" style="background: none; border: none; color: #e94560; cursor: pointer; margin-right: 8px">编辑</button>
               <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer">删除</button>
@@ -98,16 +104,32 @@
 import { ref, onMounted } from 'vue'
 import { faultCasesApi } from '../api'
 
+function formatDateTime(val: string) {
+  if (!val) return ''
+  const d = val.replace('T', ' ')
+  return d.slice(0, 16)
+}
+
 const loading = ref(false)
 const saving = ref(false)
 const showDialog = ref(false)
 const search = ref('')
+const filterTag = ref('')
 const list = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
 const editId = ref<number | string | null>(null)
 const errors = ref<Record<string, string>>({})
+const availableTags = ref<string[]>([])
+
+async function loadTags() {
+  try {
+    const res = await faultCasesApi.tags() as any
+    const d = res.data ?? res
+    availableTags.value = Array.isArray(d) ? d : (d.items ?? [])
+  } catch {}
+}
 
 const form = ref({
   title: '',
@@ -122,6 +144,10 @@ const form = ref({
 function validate(): boolean {
   errors.value = {}
   if (!form.value.title?.trim()) errors.value.title = '请输入标题'
+  if (!form.value.environment?.trim()) errors.value.environment = '请输入环境信息'
+  if (!form.value.symptom?.trim()) errors.value.symptom = '请输入故障现象'
+  if (!form.value.rootCause?.trim()) errors.value.rootCause = '请输入根因分析'
+  if (!form.value.solution?.trim()) errors.value.solution = '请输入解决方案'
   return Object.keys(errors.value).length === 0
 }
 
@@ -130,6 +156,7 @@ async function loadData() {
   try {
     const params: any = { skip: (page.value - 1) * pageSize, limit: pageSize }
     if (search.value) params.search = search.value
+    if (filterTag.value) params.tag = filterTag.value
     const res = await faultCasesApi.list(params) as any
     const d = res.data ?? res
     list.value = d.items ?? d ?? []
@@ -176,22 +203,27 @@ async function handleSave() {
     }
     showDialog.value = false
     loadData()
+    loadTags()
   } catch (err: any) {
-    // 保存失败静默处理
+    alert('保存失败: ' + (err?.response?.data?.message || err?.message || '未知错误'))
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
-  if (!confirm('确认删除？')) return
+  if (!confirm('⚠️ 确认删除此故障案例？\n\n删除后数据将被隐藏，如需恢复请联系管理员。')) return
   try {
     await faultCasesApi.remove(id)
     loadData()
+    loadTags()
   } catch (err: any) {
     // 删除失败静默处理
   }
 }
 
-onMounted(() => loadData())
+onMounted(() => {
+  loadData()
+  loadTags()
+})
 </script>

@@ -7,7 +7,16 @@ export function fail(message: string, code = 400) {
 }
 
 export function now() {
-  return new Date().toISOString().replace('T', ' ').slice(0, 19)
+  // 返回北京时间 (UTC+8)
+  const d = new Date()
+  const beijing = new Date(d.getTime() + 8 * 60 * 60 * 1000)
+  const y = beijing.getUTCFullYear()
+  const m = String(beijing.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(beijing.getUTCDate()).padStart(2, '0')
+  const h = String(beijing.getUTCHours()).padStart(2, '0')
+  const min = String(beijing.getUTCMinutes()).padStart(2, '0')
+  const s = String(beijing.getUTCSeconds()).padStart(2, '0')
+  return `${y}-${m}-${day} ${h}:${min}:${s}`
 }
 
 // 将 snake_case 数据库行转为 camelCase

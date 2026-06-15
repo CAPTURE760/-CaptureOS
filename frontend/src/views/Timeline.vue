@@ -26,7 +26,7 @@
             <span style="font-size: 16px; font-weight: 600; color: #e0e0e0">{{ item.eventTitle }}</span>
             <div style="display: flex; align-items: center; gap: 8px">
               <span :style="{ padding: '2px 8px', borderRadius: '4px', fontSize: '12px', ...tagStyle(item.eventType) }">{{ item.eventType }}</span>
-              <span style="font-size: 13px; color: #8b949e">{{ item.eventDate }}</span>
+              <span style="font-size: 13px; color: #8b949e">{{ formatDateTime(item.eventDate) }}</span>
               <button @click="openDialog(item)" style="background: none; border: none; color: #e94560; cursor: pointer; font-size: 13px">编辑</button>
               <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer; font-size: 13px">删除</button>
             </div>
@@ -54,8 +54,8 @@
             <div v-if="errors.eventTitle" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.eventTitle }}</div>
           </div>
           <div>
-            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件日期 *</label>
-            <input v-model="form.eventDate" type="date" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件日期时间 *</label>
+            <input v-model="form.eventDate" type="datetime-local" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
             <div v-if="errors.eventDate" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.eventDate }}</div>
           </div>
           <div>
@@ -88,6 +88,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { timelineApi } from '../api'
+import { beijingNow } from '../utils/time'
+
+function formatDateTime(val: string) {
+  if (!val) return ''
+  const d = val.replace('T', ' ')
+  if (d.length === 10) return d + ' 00:00'
+  return d.slice(0, 16)
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -101,7 +109,7 @@ const errors = ref<Record<string, string>>({})
 
 const form = ref({
   eventTitle: '',
-  eventDate: new Date().toISOString().split('T')[0],
+  eventDate: beijingNow(),
   eventType: '',
   description: '',
 })
@@ -182,14 +190,14 @@ async function handleSave() {
     showDialog.value = false
     loadData()
   } catch (err: any) {
-    // 保存失败静默处理
+    alert('保存失败: ' + (err?.response?.data?.message || err?.message || '未知错误'))
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
-  if (!confirm('确认删除？')) return
+  if (!confirm('⚠️ 确认删除此时间轴事件？\n\n删除后数据将被隐藏，如需恢复请联系管理员。')) return
   try {
     await timelineApi.remove(id)
     loadData()

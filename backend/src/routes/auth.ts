@@ -3,9 +3,15 @@ import { z } from 'zod'
 import bcryptjs from 'bcryptjs'
 import { db } from '../db/index.js'
 import { signToken, authMiddleware } from '../middleware/auth.js'
+import { rateLimit } from '../middleware/rate-limit.js'
 import { ok, fail } from '../lib/utils.js'
 
 const auth = new Hono()
+
+// 登录限流：每 IP 每分钟最多 10 次
+auth.use('/login', rateLimit(10, 60000))
+// 注册限流：每 IP 每分钟最多 5 次
+auth.use('/register', rateLimit(5, 60000))
 
 const registerSchema = z.object({
   username: z.string().min(2).max(20),

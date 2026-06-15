@@ -25,6 +25,7 @@
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">答案</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">场景</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">分类</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">创建时间</th>
             <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">操作</th>
           </tr>
         </thead>
@@ -34,6 +35,7 @@
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.answer }}</td>
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.scenario }}</td>
             <td style="padding: 12px 16px; color: #e0e0e0">{{ item.category }}</td>
+            <td style="padding: 12px 16px; color: #a0aec0; font-size: 13px">{{ formatDateTime(item.createdAt) }}</td>
             <td style="padding: 12px 16px">
               <button @click="openDialog(item)" style="background: none; border: none; color: #e94560; cursor: pointer; margin-right: 8px">编辑</button>
               <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer">删除</button>
@@ -86,6 +88,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { knowledgeApi } from '../api'
+
+function formatDateTime(val: string) {
+  if (!val) return ''
+  const d = val.replace('T', ' ')
+  return d.slice(0, 16)
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -157,14 +165,14 @@ async function handleSave() {
     showDialog.value = false
     loadData()
   } catch (err: any) {
-    // 保存失败静默处理
+    alert('保存失败: ' + (err?.response?.data?.message || err?.message || '未知错误'))
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
-  if (!confirm('确认删除？')) return
+  if (!confirm('⚠️ 确认删除此知识卡片？\n\n删除后数据将被隐藏，如需恢复请联系管理员。')) return
   try {
     await knowledgeApi.remove(id)
     loadData()
