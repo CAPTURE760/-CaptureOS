@@ -2,57 +2,35 @@
   <div>
     <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">驾驶舱</h2>
 
-    <n-grid :cols="4" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
-      <n-gi span="4 m:1">
-        <n-card :style="cardStyle">
-          <n-statistic label="资产总数">
-            <n-number-animation :from="0" :to="stats.total ?? 0" />
-          </n-statistic>
-        </n-card>
-      </n-gi>
-      <n-gi span="4 m:1">
-        <n-card :style="cardStyle">
-          <n-statistic label="今日新增">
-            <n-number-animation :from="0" :to="today.total ?? 0" />
-          </n-statistic>
-        </n-card>
-      </n-gi>
-      <n-gi span="4 m:1">
-        <n-card :style="cardStyle">
-          <n-statistic label="连续记录">
-            <n-number-animation :from="0" :to="streak.streak ?? 0" />
-            <template #suffix>天</template>
-          </n-statistic>
-        </n-card>
-      </n-gi>
-      <n-gi span="4 m:1">
-        <n-card :style="cardStyle">
-          <n-statistic label="距上次沉淀">
-            <n-number-animation :from="0" :to="stagnation.stagnation_days ?? 0" />
-            <template #suffix>天</template>
-          </n-statistic>
-        </n-card>
-      </n-gi>
-    </n-grid>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px">
+      <n-card :style="cardStyle">
+        <n-statistic label="资产总数" :value="stats.total ?? 0" />
+      </n-card>
+      <n-card :style="cardStyle">
+        <n-statistic label="今日新增" :value="today.total ?? 0" />
+      </n-card>
+      <n-card :style="cardStyle">
+        <n-statistic label="连续记录" :value="streak.streak ?? 0" suffix="天" />
+      </n-card>
+      <n-card :style="cardStyle">
+        <n-statistic label="距上次沉淀" :value="stagnation.stagnation_days ?? 0" suffix="天" />
+      </n-card>
+    </div>
 
-    <n-grid :cols="2" :x-gap="16" style="margin-top: 16px">
-      <n-gi>
-        <n-card title="近12月趋势" :style="cardStyle">
-          <n-data-table :columns="trendColumns" :data="monthlyTrend" :bordered="false" size="small" />
-        </n-card>
-      </n-gi>
-      <n-gi>
-        <n-card title="资产分类占比" :style="cardStyle">
-          <n-data-table :columns="ratioColumns" :data="ratioRows" :bordered="false" size="small" />
-        </n-card>
-      </n-gi>
-    </n-grid>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+      <n-card title="近12月趋势" :style="cardStyle">
+        <n-data-table :columns="trendColumns" :data="monthlyTrend" :bordered="false" size="small" />
+      </n-card>
+      <n-card title="资产分类占比" :style="cardStyle">
+        <n-data-table :columns="ratioColumns" :data="ratioRows" :bordered="false" size="small" />
+      </n-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { NGrid, NGi, NCard, NStatistic, NNumberAnimation, NDataTable } from 'naive-ui'
+import { NCard, NStatistic, NDataTable } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { dashboardApi } from '../api'
 
@@ -67,10 +45,10 @@ const categoryRatio = ref<any>({})
 
 const trendColumns: DataTableColumns<any> = [
   { title: '月份', key: 'month', width: 100 },
-  { title: '工作案例', key: 'work_cases' },
-  { title: '故障案例', key: 'fault_cases' },
-  { title: '实验室', key: 'labs' },
-  { title: '知识卡片', key: 'knowledge_cards' },
+  { title: '工作', key: 'work_cases' },
+  { title: '故障', key: 'fault_cases' },
+  { title: '实验', key: 'labs' },
+  { title: '知识', key: 'knowledge_cards' },
   { title: '合计', key: 'total' },
 ]
 
@@ -93,15 +71,19 @@ const ratioRows = computed(() => {
 })
 
 onMounted(async () => {
-  const [s, t, st, sg, mt, cr] = await Promise.allSettled([
-    dashboardApi.getStats(), dashboardApi.getToday(), dashboardApi.getStreak(),
-    dashboardApi.getStagnation(), dashboardApi.getMonthlyTrend(), dashboardApi.getCategoryRatio(),
-  ])
-  if (s.status === 'fulfilled') stats.value = (s.value as any)?.data || {}
-  if (t.status === 'fulfilled') today.value = (t.value as any)?.data || {}
-  if (st.status === 'fulfilled') streak.value = (st.value as any)?.data || {}
-  if (sg.status === 'fulfilled') stagnation.value = (sg.value as any)?.data || {}
-  if (mt.status === 'fulfilled') monthlyTrend.value = (mt.value as any)?.data || []
-  if (cr.status === 'fulfilled') categoryRatio.value = (cr.value as any)?.data || {}
+  try {
+    const [s, t, st, sg, mt, cr] = await Promise.allSettled([
+      dashboardApi.getStats(), dashboardApi.getToday(), dashboardApi.getStreak(),
+      dashboardApi.getStagnation(), dashboardApi.getMonthlyTrend(), dashboardApi.getCategoryRatio(),
+    ])
+    if (s.status === 'fulfilled') stats.value = (s.value as any)?.data || {}
+    if (t.status === 'fulfilled') today.value = (t.value as any)?.data || {}
+    if (st.status === 'fulfilled') streak.value = (st.value as any)?.data || {}
+    if (sg.status === 'fulfilled') stagnation.value = (sg.value as any)?.data || {}
+    if (mt.status === 'fulfilled') monthlyTrend.value = (mt.value as any)?.data || []
+    if (cr.status === 'fulfilled') categoryRatio.value = (cr.value as any)?.data || {}
+  } catch (e) {
+    // 忽略错误
+  }
 })
 </script>
