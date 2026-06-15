@@ -1,224 +1,285 @@
-# 仪表盘路由
-# 统计数据、趋势分析、风险预警
+<template>
+  <div class="dashboard">
+    <div class="page-header">
+      <h2>驾驶舱</h2>
+    </div>
 
-from datetime import date, timedelta, datetime
+    <!-- 统计卡片 -->
+    <el-row :gutter="20" class="stat-cards">
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card">
+          <div class="stat-icon" style="background: rgba(233,69,96,0.15); color: #e94560">
+            <el-icon :size="28"><DataAnalysis /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.total || 0 }}</div>
+            <div class="stat-label">资产总数</div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card">
+          <div class="stat-icon" style="background: rgba(0,194,146,0.15); color: #00c292">
+            <el-icon :size="28"><Plus /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ today.total || 0 }}</div>
+            <div class="stat-label">今日新增</div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card">
+          <div class="stat-icon" style="background: rgba(255,187,51,0.15); color: #ffbb33">
+            <el-icon :size="28"><TrendCharts /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ streak.streak || 0 }} 天</div>
+            <div class="stat-label">连续记录</div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card">
+          <div class="stat-icon" :style="stagnationStyle">
+            <el-icon :size="28"><Warning /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stagnation.stagnation_days ?? '-' }} 天</div>
+            <div class="stat-label">距上次沉淀</div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+    <!-- 图表区域 -->
+    <el-row :gutter="20" style="margin-top: 20px">
+      <el-col :span="16">
+        <el-card shadow="hover" class="chart-card">
+          <template #header>
+            <span>近 12 个月资产增长趋势</span>
+          </template>
+          <div class="chart-wrapper">
+            <Line v-if="trendReady" :data="trendData" :options="lineOptions" />
+            <el-empty v-else description="暂无数据" />
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="hover" class="chart-card">
+          <template #header>
+            <span>资产分类占比</span>
+          </template>
+          <div class="chart-wrapper">
+            <Doughnut v-if="ratioReady" :data="ratioData" :options="doughnutOptions" />
+            <el-empty v-else description="暂无数据" />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
+</template>
 
-from app.core.deps import get_db, get_current_user
-from app.models.models import (
-    User, WorkCase, FaultCase, Lab, KnowledgeCard,
-    Project, DailyLog, TimeRecord, TimelineEvent,
-)
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { Line, Doughnut } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, PointElement, LineElement,
+  ArcElement, Tooltip, Legend, Filler
+} from 'chart.js'
+import { getStats, getToday, getStreak, getStagnation, getMonthlyTrend, getCategoryRatio } from '../api/dashboard'
 
-router = APIRouter(prefix="/dashboard", tags=["仪表盘"])
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler)
 
+const stats = ref({})
+const today = ref({})
+const streak = ref({})
+const stagnation = ref({})
+const monthlyTrend = ref([])
+const categoryRatio = ref({})
 
-@router.get("/stats", response_model=dict)
-async def get_stats(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取所有资产计数统计"""
-    wc = (await db.execute(select(func.count()).select_from(WorkCase))).scalar_one()
-    fc = (await db.execute(select(func.count()).select_from(FaultCase))).scalar_one()
-    lc = (await db.execute(select(func.count()).select_from(Lab))).scalar_one()
-    kc = (await db.execute(select(func.count()).select_from(KnowledgeCard))).scalar_one()
-    pc = (await db.execute(select(func.count()).select_from(Project))).scalar_one()
+// 停滞天数颜色
+const stagnationStyle = computed(() => {
+  const days = stagnation.value.stagnation_days
+  if (days == null) return { background: 'rgba(160,174,192,0.15)', color: '#a0aec0' }
+  if (days <= 3) return { background: 'rgba(0,194,146,0.15)', color: '#00c292' }
+  if (days <= 7) return { background: 'rgba(255,187,51,0.15)', color: '#ffbb33' }
+  return { background: 'rgba(233,69,96,0.15)', color: '#e94560' }
+})
 
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {
-            "work_cases": wc,
-            "fault_cases": fc,
-            "labs": lc,
-            "knowledge_cards": kc,
-            "projects": pc,
-            "total": wc + fc + lc + kc + pc,
-        },
+// 趋势图数据
+const trendReady = computed(() => monthlyTrend.value.length > 0)
+const trendData = computed(() => ({
+  labels: monthlyTrend.value.map(i => i.month),
+  datasets: [
+    {
+      label: '工作案例',
+      data: monthlyTrend.value.map(i => i.work_cases),
+      borderColor: '#e94560',
+      backgroundColor: 'rgba(233,69,96,0.1)',
+      fill: true,
+      tension: 0.4
+    },
+    {
+      label: '故障案例',
+      data: monthlyTrend.value.map(i => i.fault_cases),
+      borderColor: '#00c292',
+      backgroundColor: 'rgba(0,194,146,0.1)',
+      fill: true,
+      tension: 0.4
+    },
+    {
+      label: '实验室',
+      data: monthlyTrend.value.map(i => i.labs),
+      borderColor: '#ffbb33',
+      backgroundColor: 'rgba(255,187,51,0.1)',
+      fill: true,
+      tension: 0.4
+    },
+    {
+      label: '知识卡片',
+      data: monthlyTrend.value.map(i => i.knowledge_cards),
+      borderColor: '#4fc3f7',
+      backgroundColor: 'rgba(79,195,247,0.1)',
+      fill: true,
+      tension: 0.4
     }
+  ]
+}))
 
+const lineOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#a0aec0' } }
+  },
+  scales: {
+    x: { ticks: { color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+    y: { ticks: { color: '#a0aec0', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+  }
+}
 
-@router.get("/today", response_model=dict)
-async def get_today_stats(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取今日新增资产统计"""
-    today = date.today()
-    today_start = datetime.combine(today, datetime.min.time())
+// 饼图数据
+const ratioReady = computed(() => {
+  const d = categoryRatio.value
+  return d && d.total > 0
+})
+const ratioData = computed(() => {
+  const d = categoryRatio.value
+  return {
+    labels: ['工作案例', '故障案例', '实验室', '知识卡片', '项目资产'],
+    datasets: [{
+      data: [
+        d.work_cases?.count || 0,
+        d.fault_cases?.count || 0,
+        d.labs?.count || 0,
+        d.knowledge_cards?.count || 0,
+        d.projects?.count || 0
+      ],
+      backgroundColor: ['#e94560', '#00c292', '#ffbb33', '#4fc3f7', '#ab47bc'],
+      borderWidth: 0
+    }]
+  }
+})
 
-    wc = (await db.execute(
-        select(func.count()).select_from(WorkCase).where(WorkCase.created_at >= today_start)
-    )).scalar_one()
-    fc = (await db.execute(
-        select(func.count()).select_from(FaultCase).where(FaultCase.created_at >= today_start)
-    )).scalar_one()
-    lc = (await db.execute(
-        select(func.count()).select_from(Lab).where(Lab.created_at >= today_start)
-    )).scalar_one()
-    kc = (await db.execute(
-        select(func.count()).select_from(KnowledgeCard).where(KnowledgeCard.created_at >= today_start)
-    )).scalar_one()
-
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {
-            "date": str(today),
-            "work_cases": wc,
-            "fault_cases": fc,
-            "labs": lc,
-            "knowledge_cards": kc,
-            "total": wc + fc + lc + kc,
-        },
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'bottom',
+      labels: { color: '#a0aec0', padding: 16 }
     }
+  }
+}
 
+onMounted(async () => {
+  const [s, t, st, sg, mt, cr] = await Promise.allSettled([
+    getStats(), getToday(), getStreak(), getStagnation(), getMonthlyTrend(), getCategoryRatio()
+  ])
+  if (s.status === 'fulfilled') stats.value = s.value?.data || {}
+  if (t.status === 'fulfilled') today.value = t.value?.data || {}
+  if (st.status === 'fulfilled') streak.value = st.value?.data || {}
+  if (sg.status === 'fulfilled') stagnation.value = sg.value?.data || {}
+  if (mt.status === 'fulfilled') monthlyTrend.value = mt.value?.data || []
+  if (cr.status === 'fulfilled') categoryRatio.value = cr.value?.data || {}
+})
+</script>
 
-@router.get("/streak", response_model=dict)
-async def get_streak(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取连续记录天数"""
-    result = await db.execute(
-        select(DailyLog.date).order_by(DailyLog.date.desc())
-    )
-    dates = [row[0] for row in result.all()]
+<style scoped>
+.dashboard {
+  color: #e0e0e0;
+}
 
-    if not dates:
-        return {"code": 200, "message": "success", "data": {"streak": 0}}
+.page-header h2 {
+  margin: 0 0 20px 0;
+  font-size: 22px;
+  color: #e0e0e0;
+}
 
-    streak = 1
-    for i in range(1, len(dates)):
-        if dates[i - 1] - dates[i] == timedelta(days=1):
-            streak += 1
-        else:
-            break
+.stat-cards .el-card {
+  background-color: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
 
-    if dates[0] < date.today() - timedelta(days=1):
-        streak = 0
+.stat-card {
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
 
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {"streak": streak, "last_date": str(dates[0]) if dates else None},
-    }
+.stat-card :deep(.el-card__body) {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
 
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
-@router.get("/stagnation", response_model=dict)
-async def get_stagnation(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取资产停滞天数"""
-    tables = [WorkCase, FaultCase, Lab, KnowledgeCard, Project]
-    latest_dates = []
+.stat-info {
+  flex: 1;
+}
 
-    for table in tables:
-        result = await db.execute(
-            select(func.max(table.created_at)).select_from(table)
-        )
-        max_date = result.scalar_one_or_none()
-        if max_date:
-            latest_dates.append(max_date.date())
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #e0e0e0;
+  line-height: 1.2;
+}
 
-    if not latest_dates:
-        return {
-            "code": 200,
-            "message": "success",
-            "data": {"stagnation_days": 999, "last_activity": None},
-        }
+.stat-label {
+  font-size: 13px;
+  color: #a0aec0;
+  margin-top: 4px;
+}
 
-    last_activity = max(latest_dates)
-    stagnation_days = (date.today() - last_activity).days
+.chart-card {
+  background-color: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
 
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {
-            "stagnation_days": stagnation_days,
-            "last_activity": str(last_activity),
-        },
-    }
+.chart-card :deep(.el-card__header) {
+  color: #e0e0e0;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
 
-
-@router.get("/monthly-trend", response_model=dict)
-async def get_monthly_trend(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取最近12个月的资产增长趋势"""
-    trend = []
-    today = date.today()
-
-    for i in range(11, -1, -1):
-        month_date = today - timedelta(days=i * 30)
-        year, month = month_date.year, month_date.month
-        month_start = datetime(year, month, 1)
-        if month == 12:
-            month_end = datetime(year + 1, 1, 1)
-        else:
-            month_end = datetime(year, month + 1, 1)
-
-        wc = (await db.execute(
-            select(func.count()).select_from(WorkCase).where(
-                and_(WorkCase.created_at >= month_start, WorkCase.created_at < month_end)
-            )
-        )).scalar_one()
-        fc = (await db.execute(
-            select(func.count()).select_from(FaultCase).where(
-                and_(FaultCase.created_at >= month_start, FaultCase.created_at < month_end)
-            )
-        )).scalar_one()
-        lc = (await db.execute(
-            select(func.count()).select_from(Lab).where(
-                and_(Lab.created_at >= month_start, Lab.created_at < month_end)
-            )
-        )).scalar_one()
-        kc = (await db.execute(
-            select(func.count()).select_from(KnowledgeCard).where(
-                and_(KnowledgeCard.created_at >= month_start, KnowledgeCard.created_at < month_end)
-            )
-        )).scalar_one()
-
-        trend.append({
-            "month": f"{year}-{month:02d}",
-            "work_cases": wc,
-            "fault_cases": fc,
-            "labs": lc,
-            "knowledge_cards": kc,
-            "total": wc + fc + lc + kc,
-        })
-
-    return {"code": 200, "message": "success", "data": trend}
-
-
-@router.get("/category-ratio", response_model=dict)
-async def get_category_ratio(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取资产分类占比"""
-    wc = (await db.execute(select(func.count()).select_from(WorkCase))).scalar_one()
-    fc = (await db.execute(select(func.count()).select_from(FaultCase))).scalar_one()
-    lc = (await db.execute(select(func.count()).select_from(Lab))).scalar_one()
-    kc = (await db.execute(select(func.count()).select_from(KnowledgeCard))).scalar_one()
-    pc = (await db.execute(select(func.count()).select_from(Project))).scalar_one()
-    total = wc + fc + lc + kc + pc
-
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {
-            "work_cases": {"count": wc, "ratio": round(wc / total, 4) if total else 0},
-            "fault_cases": {"count": fc, "ratio": round(fc / total, 4) if total else 0},
-            "labs": {"count": lc, "ratio": round(lc / total, 4) if total else 0},
-            "knowledge_cards": {"count": kc, "ratio": round(kc / total, 4) if total else 0},
-            "projects": {"count": pc, "ratio": round(pc / total, 4) if total else 0},
-            "total": total,
-        },
-    }
+.chart-wrapper {
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>
