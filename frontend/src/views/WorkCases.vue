@@ -1,220 +1,198 @@
 <template>
-  <div class="page">
-    <div class="page-header">
-      <h2 class="page-title">工作案例</h2>
-      <n-space>
-        <n-input v-model:value="search" placeholder="搜索..." clearable style="width: 200px" @clear="fetchList" @keyup.enter="fetchList" />
-        <n-button type="primary" @click="openCreate">+ 新建</n-button>
-      </n-space>
+  <div>
+    <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">工作案例</h2>
+
+    <!-- 搜索栏 -->
+    <div style="display: flex; gap: 12px; margin-bottom: 20px">
+      <input v-model="search" placeholder="搜索..." style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; width: 200px" @keyup.enter="loadData" />
+      <button @click="loadData" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">搜索</button>
+      <button @click="openDialog()" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">新增</button>
     </div>
 
-    <n-data-table
-      :columns="columns"
-      :data="list"
-      :loading="loading"
-      :bordered="false"
-      class="data-table"
-    />
-
-    <div class="pagination-wrap">
-      <n-pagination v-model:page="page" :page-count="totalPages" @update:page="fetchList" />
+    <!-- 表格 -->
+    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
+      <table style="width: 100%; border-collapse: collapse">
+        <thead>
+          <tr style="background: #1a1a2e">
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">标题</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">医院</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">系统</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">耗时</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">标签</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in list" :key="item.id" style="border-bottom: 1px solid rgba(255,255,255,0.06)">
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.title }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.hospitalName }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.systemType }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.costTime }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ formatTags(item.tags) }}</td>
+            <td style="padding: 12px 16px">
+              <button @click="openDialog(item)" style="background: none; border: none; color: #e94560; cursor: pointer; margin-right: 8px">编辑</button>
+              <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
     </div>
 
-    <n-modal
-      v-model:show="showModal"
-      preset="dialog"
-      :title="editingId ? '编辑工作案例' : '新建工作案例'"
-      positive-text="提交"
-      negative-text="取消"
-      :loading="submitting"
-      @positive-click="handleSubmit"
-      style="width: 640px"
-    >
-      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
-        <n-form-item label="标题" path="title">
-          <n-input v-model:value="form.title" placeholder="案例标题" />
-        </n-form-item>
-        <n-form-item label="医院名称" path="hospitalName">
-          <n-input v-model:value="form.hospitalName" placeholder="医院名称" />
-        </n-form-item>
-        <n-form-item label="系统类型" path="systemType">
-          <n-input v-model:value="form.systemType" placeholder="系统类型" />
-        </n-form-item>
-        <n-form-item label="问题描述" path="problem">
-          <n-input v-model:value="form.problem" type="textarea" placeholder="问题描述" :rows="2" />
-        </n-form-item>
-        <n-form-item label="原因分析" path="reason">
-          <n-input v-model:value="form.reason" type="textarea" placeholder="原因分析" :rows="2" />
-        </n-form-item>
-        <n-form-item label="解决方案" path="solution">
-          <n-input v-model:value="form.solution" type="textarea" placeholder="解决方案" :rows="2" />
-        </n-form-item>
-        <n-form-item label="耗时" path="costTime">
-          <n-input v-model:value="form.costTime" placeholder="耗时(如: 2小时)" />
-        </n-form-item>
-        <n-form-item label="标签" path="tags">
-          <n-input v-model:value="form.tags" placeholder="逗号分隔，如: 网络,交换机" />
-        </n-form-item>
-      </n-form>
-    </n-modal>
+    <!-- 分页 -->
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+      <button @click="page > 1 && (page--, loadData())" :disabled="page <= 1" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">上一页</button>
+      <span style="padding: 6px 12px; color: #a0aec0">第 {{ page }} 页</span>
+      <button @click="list.length === pageSize && (page++, loadData())" :disabled="list.length < pageSize" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">下一页</button>
+    </div>
+
+    <!-- 弹窗 -->
+    <div v-if="showDialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000">
+      <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 24px; width: 600px; max-height: 80vh; overflow-y: auto">
+        <h3 style="color: #e0e0e0; margin-bottom: 20px">{{ editId ? '编辑' : '新增' }} 工作案例</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">标题 *</label>
+            <input v-model="form.title" placeholder="案例标题" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">医院名称</label>
+            <input v-model="form.hospitalName" placeholder="医院名称" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">系统类型</label>
+            <input v-model="form.systemType" placeholder="系统类型" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">问题描述</label>
+            <textarea v-model="form.problem" placeholder="问题描述" rows="2" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">原因分析</label>
+            <textarea v-model="form.reason" placeholder="原因分析" rows="2" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">解决方案</label>
+            <textarea v-model="form.solution" placeholder="解决方案" rows="2" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">耗时</label>
+            <input v-model="form.costTime" placeholder="耗时(如: 2小时)" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">标签</label>
+            <input v-model="form.tags" placeholder="逗号分隔，如: 网络,交换机" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px">
+          <button @click="showDialog = false" style="padding: 8px 20px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #a0aec0; cursor: pointer">取消</button>
+          <button @click="handleSave" :disabled="saving" style="padding: 8px 20px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">{{ saving ? '保存中...' : '保存' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, h, onMounted } from 'vue'
-import {
-  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
-  NInput, NSpace, NPopconfirm, useMessage,
-} from 'naive-ui'
-import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { ref, onMounted } from 'vue'
 import { workCasesApi } from '../api'
 
-const message = useMessage()
-
-const list = ref<any[]>([])
 const loading = ref(false)
-const page = ref(1)
-const totalPages = ref(1)
+const saving = ref(false)
+const showDialog = ref(false)
 const search = ref('')
-
-const showModal = ref(false)
-const submitting = ref(false)
-const editingId = ref<number | string | null>(null)
-const formRef = ref<FormInst | null>(null)
+const list = ref<any[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = 20
+const editId = ref<number | string | null>(null)
 
 const form = ref({
-  title: '', hospitalName: '', systemType: '', problem: '',
-  reason: '', solution: '', costTime: '', tags: '',
+  title: '',
+  hospitalName: '',
+  systemType: '',
+  problem: '',
+  reason: '',
+  solution: '',
+  costTime: '',
+  tags: '',
 })
 
-const rules: FormRules = {
-  title: { required: true, message: '请输入标题', trigger: 'blur' },
+function formatTags(tags: any): string {
+  if (!tags) return ''
+  const arr = Array.isArray(tags) ? tags : String(tags).split(',')
+  return arr.map((t: string) => t.trim()).filter(Boolean).join(', ')
 }
 
-const columns: DataTableColumns<any> = [
-  { title: '标题', key: 'title', ellipsis: { tooltip: true } },
-  { title: '医院', key: 'hospitalName', ellipsis: { tooltip: true } },
-  { title: '系统', key: 'systemType', width: 100 },
-  { title: '耗时', key: 'costTime', width: 80 },
-  {
-    title: '标签', key: 'tags', width: 150,
-    render(row) {
-      const tags = Array.isArray(row.tags) ? row.tags : (row.tags ? String(row.tags).split(',') : [])
-      return tags.map((t: string) => t.trim()).filter(Boolean).join(', ')
-    },
-  },
-  {
-    title: '操作', key: 'actions', width: 140,
-    render(row) {
-      return h(NSpace, { size: 'small' }, {
-        default: () => [
-          h(NButton, { size: 'small', quaternary: true, onClick: () => openEdit(row) }, { default: () => '编辑' }),
-          h(NPopconfirm, { onPositiveClick: () => handleDelete(row.id) }, {
-            trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
-            default: () => '确认删除？',
-          }),
-        ],
-      })
-    },
-  },
-]
-
-async function fetchList() {
+async function loadData() {
   loading.value = true
   try {
-    const params: any = { page: page.value, pageSize: 20 }
+    const params: any = { skip: (page.value - 1) * pageSize, limit: pageSize }
     if (search.value) params.search = search.value
     const res = await workCasesApi.list(params) as any
     list.value = res.items ?? res.data ?? res ?? []
-    totalPages.value = res.totalPages ?? 1
+    total.value = res.total ?? 0
   } catch (err: any) {
-    message.error(err?.data?.message || '加载失败')
+    alert(err?.data?.message || '加载失败')
   } finally {
     loading.value = false
   }
 }
 
-function openCreate() {
-  editingId.value = null
-  form.value = { title: '', hospitalName: '', systemType: '', problem: '', reason: '', solution: '', costTime: '', tags: '' }
-  showModal.value = true
-}
-
-function openEdit(row: any) {
-  editingId.value = row.id
-  form.value = {
-    title: row.title ?? '',
-    hospitalName: row.hospitalName ?? '',
-    systemType: row.systemType ?? '',
-    problem: row.problem ?? '',
-    reason: row.reason ?? '',
-    solution: row.solution ?? '',
-    costTime: row.costTime ?? '',
-    tags: Array.isArray(row.tags) ? row.tags.join(',') : (row.tags ?? ''),
+function openDialog(row?: any) {
+  if (row) {
+    editId.value = row.id
+    form.value = {
+      title: row.title ?? '',
+      hospitalName: row.hospitalName ?? '',
+      systemType: row.systemType ?? '',
+      problem: row.problem ?? '',
+      reason: row.reason ?? '',
+      solution: row.solution ?? '',
+      costTime: row.costTime ?? '',
+      tags: Array.isArray(row.tags) ? row.tags.join(',') : (row.tags ?? ''),
+    }
+  } else {
+    editId.value = null
+    form.value = { title: '', hospitalName: '', systemType: '', problem: '', reason: '', solution: '', costTime: '', tags: '' }
   }
-  showModal.value = true
+  showDialog.value = true
 }
 
-async function handleSubmit() {
+async function handleSave() {
+  if (!form.value.title.trim()) {
+    alert('请输入标题')
+    return
+  }
+  saving.value = true
   try {
-    await formRef.value?.validate()
-    submitting.value = true
     const data = {
       ...form.value,
       tags: form.value.tags ? form.value.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
     }
-    if (editingId.value) {
-      await workCasesApi.update(editingId.value, data)
-      message.success('更新成功')
+    if (editId.value) {
+      await workCasesApi.update(editId.value, data)
     } else {
       await workCasesApi.create(data)
-      message.success('创建成功')
     }
-    showModal.value = false
-    fetchList()
+    showDialog.value = false
+    loadData()
   } catch (err: any) {
-    if (err?.data?.message) message.error(err.data.message)
+    alert(err?.data?.message || '保存失败')
   } finally {
-    submitting.value = false
+    saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
+  if (!confirm('确认删除？')) return
   try {
     await workCasesApi.remove(id)
-    message.success('删除成功')
-    fetchList()
+    loadData()
   } catch (err: any) {
-    message.error(err?.data?.message || '删除失败')
+    alert(err?.data?.message || '删除失败')
   }
 }
 
-onMounted(() => fetchList())
+onMounted(() => loadData())
 </script>
-
-<style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #e0e0e0;
-}
-
-.data-table {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-</style>

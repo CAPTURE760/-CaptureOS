@@ -1,79 +1,89 @@
 <template>
-  <div class="page">
-    <div class="page-header">
-      <h2 class="page-title">时间流向</h2>
-      <n-space>
-        <n-input v-model:value="search" placeholder="搜索..." clearable style="width: 200px" @clear="fetchList" @keyup.enter="fetchList" />
-        <n-button type="primary" @click="openCreate">+ 记录时间</n-button>
-      </n-space>
+  <div>
+    <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">时间流向</h2>
+
+    <!-- 顶部表单 -->
+    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 20px; margin-bottom: 20px">
+      <h3 style="color: #e0e0e0; margin-bottom: 16px; font-size: 16px">记录今日时间</h3>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
+        <div>
+          <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">日期</label>
+          <input v-model="form.date" type="date" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0" />
+        </div>
+        <div>
+          <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">工作(h)</label>
+          <input v-model.number="form.workHours" type="number" min="0" max="24" step="0.5" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; width: 80px" />
+        </div>
+        <div>
+          <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">学习(h)</label>
+          <input v-model.number="form.studyHours" type="number" min="0" max="24" step="0.5" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; width: 80px" />
+        </div>
+        <div>
+          <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">项目(h)</label>
+          <input v-model.number="form.projectHours" type="number" min="0" max="24" step="0.5" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; width: 80px" />
+        </div>
+        <div>
+          <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">娱乐(h)</label>
+          <input v-model.number="form.entertainmentHours" type="number" min="0" max="24" step="0.5" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; width: 80px" />
+        </div>
+        <div>
+          <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 13px">其他(h)</label>
+          <input v-model.number="form.otherHours" type="number" min="0" max="24" step="0.5" style="padding: 8px 12px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; width: 80px" />
+        </div>
+        <button @click="handleSave" :disabled="saving" style="padding: 8px 20px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer; height: 36px">{{ saving ? '保存中...' : '保存' }}</button>
+      </div>
     </div>
 
-    <n-data-table
-      :columns="columns"
-      :data="list"
-      :loading="loading"
-      :bordered="false"
-      class="data-table"
-    />
-
-    <div class="pagination-wrap">
-      <n-pagination v-model:page="page" :page-count="totalPages" @update:page="fetchList" />
+    <!-- 表格 -->
+    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
+      <table style="width: 100%; border-collapse: collapse">
+        <thead>
+          <tr style="background: #1a1a2e">
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">日期</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">工作</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">学习</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">项目</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">娱乐</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">其他</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in list" :key="item.id" style="border-bottom: 1px solid rgba(255,255,255,0.06)">
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.date }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.workHours }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.studyHours }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.projectHours }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.entertainmentHours }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.otherHours }}</td>
+            <td style="padding: 12px 16px">
+              <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
     </div>
 
-    <n-modal
-      v-model:show="showModal"
-      preset="dialog"
-      title="记录时间"
-      positive-text="提交"
-      negative-text="取消"
-      :loading="submitting"
-      @positive-click="handleSubmit"
-      style="width: 500px"
-    >
-      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
-        <n-form-item label="日期" path="date">
-          <n-date-picker v-model:formatted-value="form.date" type="date" value-format="yyyy-MM-dd" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="工作时长" path="workHours">
-          <n-input-number v-model:value="form.workHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="学习时长" path="studyHours">
-          <n-input-number v-model:value="form.studyHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="项目时长" path="projectHours">
-          <n-input-number v-model:value="form.projectHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="娱乐时长" path="entertainmentHours">
-          <n-input-number v-model:value="form.entertainmentHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="其他时长" path="otherHours">
-          <n-input-number v-model:value="form.otherHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
-        </n-form-item>
-      </n-form>
-    </n-modal>
+    <!-- 分页 -->
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+      <button @click="page > 1 && (page--, loadData())" :disabled="page <= 1" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">上一页</button>
+      <span style="padding: 6px 12px; color: #a0aec0">第 {{ page }} 页</span>
+      <button @click="list.length === pageSize && (page++, loadData())" :disabled="list.length < pageSize" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">下一页</button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, h, onMounted } from 'vue'
-import {
-  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
-  NDatePicker, NInputNumber, NInput, NSpace, NPopconfirm, useMessage,
-} from 'naive-ui'
-import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { ref, onMounted } from 'vue'
 import { timeRecordsApi } from '../api'
 
-const message = useMessage()
-
-const list = ref<any[]>([])
 const loading = ref(false)
+const saving = ref(false)
+const list = ref<any[]>([])
+const total = ref(0)
 const page = ref(1)
-const totalPages = ref(1)
-const search = ref('')
-
-const showModal = ref(false)
-const submitting = ref(false)
-const formRef = ref<FormInst | null>(null)
+const pageSize = 20
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -84,106 +94,53 @@ const form = ref({
   otherHours: 0,
 })
 
-const rules: FormRules = {
-  date: { required: true, message: '请选择日期', trigger: 'blur' },
-}
-
-const columns: DataTableColumns<any> = [
-  { title: '日期', key: 'date', width: 120 },
-  { title: '工作', key: 'workHours', width: 80 },
-  { title: '学习', key: 'studyHours', width: 80 },
-  { title: '项目', key: 'projectHours', width: 80 },
-  { title: '娱乐', key: 'entertainmentHours', width: 80 },
-  { title: '其他', key: 'otherHours', width: 80 },
-  {
-    title: '操作', key: 'actions', width: 80,
-    render(row) {
-      return h(NPopconfirm, { onPositiveClick: () => handleDelete(row.id) }, {
-        trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
-        default: () => '确认删除？',
-      })
-    },
-  },
-]
-
-async function fetchList() {
+async function loadData() {
   loading.value = true
   try {
-    const params: any = { page: page.value, pageSize: 20 }
-    if (search.value) params.search = search.value
+    const params: any = { skip: (page.value - 1) * pageSize, limit: pageSize }
     const res = await timeRecordsApi.list(params) as any
     list.value = res.items ?? res.data ?? res ?? []
-    totalPages.value = res.totalPages ?? 1
+    total.value = res.total ?? 0
   } catch (err: any) {
-    message.error(err?.data?.message || '加载失败')
+    alert(err?.data?.message || '加载失败')
   } finally {
     loading.value = false
   }
 }
 
-function openCreate() {
-  form.value = {
-    date: new Date().toISOString().split('T')[0],
-    workHours: 0,
-    studyHours: 0,
-    projectHours: 0,
-    entertainmentHours: 0,
-    otherHours: 0,
+async function handleSave() {
+  if (!form.value.date) {
+    alert('请选择日期')
+    return
   }
-  showModal.value = true
-}
-
-async function handleSubmit() {
+  saving.value = true
   try {
-    await formRef.value?.validate()
-    submitting.value = true
     await timeRecordsApi.create(form.value)
-    message.success('创建成功')
-    showModal.value = false
-    fetchList()
+    form.value = {
+      date: new Date().toISOString().split('T')[0],
+      workHours: 0,
+      studyHours: 0,
+      projectHours: 0,
+      entertainmentHours: 0,
+      otherHours: 0,
+    }
+    loadData()
   } catch (err: any) {
-    if (err?.data?.message) message.error(err.data.message)
+    alert(err?.data?.message || '保存失败')
   } finally {
-    submitting.value = false
+    saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
+  if (!confirm('确认删除？')) return
   try {
     await timeRecordsApi.remove(id)
-    message.success('删除成功')
-    fetchList()
+    loadData()
   } catch (err: any) {
-    message.error(err?.data?.message || '删除失败')
+    alert(err?.data?.message || '删除失败')
   }
 }
 
-onMounted(() => fetchList())
+onMounted(() => loadData())
 </script>
-
-<style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #e0e0e0;
-}
-
-.data-table {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-</style>

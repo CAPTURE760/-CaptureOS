@@ -1,82 +1,102 @@
 <template>
-  <div class="page">
-    <div class="page-header">
-      <h2 class="page-title">今日记录</h2>
-      <n-button type="primary" @click="openCreate">
-        + 新建记录
-      </n-button>
+  <div>
+    <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">今日记录</h2>
+
+    <!-- 搜索栏 -->
+    <div style="display: flex; gap: 12px; margin-bottom: 20px">
+      <button @click="openDialog()" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">新增记录</button>
     </div>
 
-    <n-data-table
-      :columns="columns"
-      :data="list"
-      :loading="loading"
-      :bordered="false"
-      class="data-table"
-    />
-
-    <div class="pagination-wrap">
-      <n-pagination
-        v-model:page="page"
-        :page-count="totalPages"
-        @update:page="fetchList"
-      />
+    <!-- 表格 -->
+    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
+      <table style="width: 100%; border-collapse: collapse">
+        <thead>
+          <tr style="background: #1a1a2e">
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">日期</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">类型</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">内容</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">收获</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">问题</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in list" :key="item.id" style="border-bottom: 1px solid rgba(255,255,255,0.06)">
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.date }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.assetType }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.content }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.gain }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.problem }}</td>
+            <td style="padding: 12px 16px">
+              <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
     </div>
 
-    <n-modal
-      v-model:show="showModal"
-      preset="dialog"
-      title="新建今日记录"
-      positive-text="提交"
-      negative-text="取消"
-      :loading="submitting"
-      @positive-click="handleSubmit"
-      style="width: 600px"
-    >
-      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="80">
-        <n-form-item label="日期" path="date">
-          <n-date-picker v-model:formatted-value="form.date" type="date" value-format="yyyy-MM-dd" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="资产类型" path="assetType">
-          <n-select
-            v-model:value="form.assetType"
-            :options="assetTypeOptions"
-            placeholder="选择类型"
-          />
-        </n-form-item>
-        <n-form-item label="内容" path="content">
-          <n-input v-model:value="form.content" type="textarea" placeholder="今日记录内容" :rows="3" />
-        </n-form-item>
-        <n-form-item label="收获" path="gain">
-          <n-input v-model:value="form.gain" type="textarea" placeholder="今日收获" :rows="2" />
-        </n-form-item>
-        <n-form-item label="问题" path="problem">
-          <n-input v-model:value="form.problem" type="textarea" placeholder="遇到的问题" :rows="2" />
-        </n-form-item>
-      </n-form>
-    </n-modal>
+    <!-- 分页 -->
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+      <button @click="page > 1 && (page--, loadData())" :disabled="page <= 1" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">上一页</button>
+      <span style="padding: 6px 12px; color: #a0aec0">第 {{ page }} 页</span>
+      <button @click="list.length === pageSize && (page++, loadData())" :disabled="list.length < pageSize" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">下一页</button>
+    </div>
+
+    <!-- 弹窗 -->
+    <div v-if="showDialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000">
+      <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 24px; width: 600px; max-height: 80vh; overflow-y: auto">
+        <h3 style="color: #e0e0e0; margin-bottom: 20px">新增今日记录</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">日期 *</label>
+            <input v-model="form.date" type="date" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">资产类型 *</label>
+            <select v-model="form.assetType" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box">
+              <option value="">请选择</option>
+              <option value="work_case">工作案例</option>
+              <option value="fault_case">故障案例</option>
+              <option value="lab">实验</option>
+              <option value="knowledge">知识</option>
+              <option value="project">项目</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">内容 *</label>
+            <textarea v-model="form.content" placeholder="今日记录内容" rows="3" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">收获</label>
+            <textarea v-model="form.gain" placeholder="今日收获" rows="2" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">问题</label>
+            <textarea v-model="form.problem" placeholder="遇到的问题" rows="2" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px">
+          <button @click="showDialog = false" style="padding: 8px 20px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #a0aec0; cursor: pointer">取消</button>
+          <button @click="handleSave" :disabled="saving" style="padding: 8px 20px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">{{ saving ? '保存中...' : '保存' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, h, onMounted } from 'vue'
-import {
-  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
-  NInput, NDatePicker, NSelect, NPopconfirm, useMessage,
-} from 'naive-ui'
-import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { ref, onMounted } from 'vue'
 import { dailyLogsApi } from '../api'
 
-const message = useMessage()
-
-const list = ref<any[]>([])
 const loading = ref(false)
+const saving = ref(false)
+const showDialog = ref(false)
+const list = ref<any[]>([])
+const total = ref(0)
 const page = ref(1)
-const totalPages = ref(1)
-
-const showModal = ref(false)
-const submitting = ref(false)
-const formRef = ref<FormInst | null>(null)
+const pageSize = 20
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -86,56 +106,21 @@ const form = ref({
   problem: '',
 })
 
-const rules: FormRules = {
-  date: { required: true, message: '请选择日期', trigger: 'blur' },
-  assetType: { required: true, message: '请选择资产类型', trigger: 'change' },
-  content: { required: true, message: '请输入内容', trigger: 'blur' },
-}
-
-const assetTypeOptions = [
-  { label: '工作案例', value: 'work_case' },
-  { label: '故障案例', value: 'fault_case' },
-  { label: '实验', value: 'lab' },
-  { label: '知识', value: 'knowledge' },
-  { label: '项目', value: 'project' },
-  { label: '其他', value: 'other' },
-]
-
-const columns: DataTableColumns<any> = [
-  { title: '日期', key: 'date', width: 120 },
-  { title: '类型', key: 'assetType', width: 100 },
-  { title: '内容', key: 'content', ellipsis: { tooltip: true } },
-  { title: '收获', key: 'gain', ellipsis: { tooltip: true } },
-  { title: '问题', key: 'problem', ellipsis: { tooltip: true } },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 80,
-    render(row) {
-      return h(NPopconfirm, {
-        onPositiveClick: () => handleDelete(row.id),
-      }, {
-        trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
-        default: () => '确认删除？',
-      })
-    },
-  },
-]
-
-async function fetchList() {
+async function loadData() {
   loading.value = true
   try {
-    const res = await dailyLogsApi.list({ page: page.value, pageSize: 20 }) as any
+    const params: any = { skip: (page.value - 1) * pageSize, limit: pageSize }
+    const res = await dailyLogsApi.list(params) as any
     list.value = res.items ?? res.data ?? res ?? []
-    totalPages.value = res.totalPages ?? 1
+    total.value = res.total ?? 0
   } catch (err: any) {
-    message.error(err?.data?.message || '加载失败')
+    alert(err?.data?.message || '加载失败')
   } finally {
     loading.value = false
   }
 }
 
-function openCreate() {
+function openDialog() {
   form.value = {
     date: new Date().toISOString().split('T')[0],
     assetType: '',
@@ -143,62 +128,43 @@ function openCreate() {
     gain: '',
     problem: '',
   }
-  showModal.value = true
+  showDialog.value = true
 }
 
-async function handleSubmit() {
+async function handleSave() {
+  if (!form.value.date) {
+    alert('请选择日期')
+    return
+  }
+  if (!form.value.assetType) {
+    alert('请选择资产类型')
+    return
+  }
+  if (!form.value.content.trim()) {
+    alert('请输入内容')
+    return
+  }
+  saving.value = true
   try {
-    await formRef.value?.validate()
-    submitting.value = true
     await dailyLogsApi.create(form.value)
-    message.success('创建成功')
-    showModal.value = false
-    fetchList()
+    showDialog.value = false
+    loadData()
   } catch (err: any) {
-    if (err?.data?.message) {
-      message.error(err.data.message)
-    }
+    alert(err?.data?.message || '保存失败')
   } finally {
-    submitting.value = false
+    saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
+  if (!confirm('确认删除？')) return
   try {
     await dailyLogsApi.remove(id)
-    message.success('删除成功')
-    fetchList()
+    loadData()
   } catch (err: any) {
-    message.error(err?.data?.message || '删除失败')
+    alert(err?.data?.message || '删除失败')
   }
 }
 
-onMounted(() => fetchList())
+onMounted(() => loadData())
 </script>
-
-<style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #e0e0e0;
-}
-
-.data-table {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-</style>

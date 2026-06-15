@@ -1,96 +1,96 @@
 <template>
-  <div class="page">
-    <div class="page-header">
-      <h2 class="page-title">成长时间轴</h2>
-      <n-button type="primary" @click="openCreate">+ 新建事件</n-button>
+  <div>
+    <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">成长时间轴</h2>
+
+    <!-- 操作栏 -->
+    <div style="display: flex; gap: 12px; margin-bottom: 20px">
+      <button @click="openDialog()" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">新增事件</button>
     </div>
 
-    <div v-if="loading" class="loading-wrap">
-      <n-spin size="medium" />
-    </div>
+    <!-- 加载中 -->
+    <div v-if="loading" style="display: flex; justify-content: center; align-items: center; min-height: 200px; color: #a0aec0">加载中...</div>
 
-    <div v-else-if="list.length === 0" class="empty-wrap">
-      <n-empty description="暂无事件" />
-    </div>
+    <!-- 空状态 -->
+    <div v-else-if="!list.length" style="display: flex; justify-content: center; align-items: center; min-height: 200px; color: #a0aec0">暂无事件</div>
 
-    <div v-else class="timeline-list">
-      <div v-for="item in list" :key="item.id" class="timeline-item">
-        <div class="timeline-dot" :class="eventTypeClass(item.eventType)" />
-        <n-card class="timeline-card" size="small">
-          <div class="timeline-header">
-            <span class="timeline-title">{{ item.eventTitle }}</span>
-            <n-space size="small">
-              <n-tag :type="eventTypeTag(item.eventType)" size="small" :bordered="false">
-                {{ item.eventType }}
-              </n-tag>
-              <span class="timeline-date">{{ item.eventDate }}</span>
-              <n-button size="tiny" quaternary @click="openEdit(item)">编辑</n-button>
-              <n-popconfirm @positive-click="handleDelete(item.id)">
-                <template #trigger>
-                  <n-button size="tiny" type="error" quaternary>删除</n-button>
-                </template>
-                确认删除？
-              </n-popconfirm>
-            </n-space>
+    <!-- 时间轴列表 -->
+    <div v-else style="position: relative; padding-left: 24px">
+      <div style="position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.08)"></div>
+      <div v-for="item in list" :key="item.id" style="position: relative; margin-bottom: 16px">
+        <div :style="{ position: 'absolute', left: '-20px', top: '14px', width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #161b22', zIndex: '1', background: dotColor(item.eventType) }"></div>
+        <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 16px">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px">
+            <span style="font-size: 16px; font-weight: 600; color: #e0e0e0">{{ item.eventTitle }}</span>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span :style="{ padding: '2px 8px', borderRadius: '4px', fontSize: '12px', ...tagStyle(item.eventType) }">{{ item.eventType }}</span>
+              <span style="font-size: 13px; color: #8b949e">{{ item.eventDate }}</span>
+              <button @click="openDialog(item)" style="background: none; border: none; color: #e94560; cursor: pointer; font-size: 13px">编辑</button>
+              <button @click="handleDelete(item.id)" style="background: none; border: none; color: #ff6b81; cursor: pointer; font-size: 13px">删除</button>
+            </div>
           </div>
-          <p class="timeline-desc">{{ item.description }}</p>
-        </n-card>
+          <p style="font-size: 14px; color: #c0c0c0; line-height: 1.6; margin: 0">{{ item.description }}</p>
+        </div>
       </div>
     </div>
 
-    <div class="pagination-wrap">
-      <n-pagination v-model:page="page" :page-count="totalPages" @update:page="fetchList" />
+    <!-- 分页 -->
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+      <button @click="page > 1 && (page--, loadData())" :disabled="page <= 1" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">上一页</button>
+      <span style="padding: 6px 12px; color: #a0aec0">第 {{ page }} 页</span>
+      <button @click="list.length === pageSize && (page++, loadData())" :disabled="list.length < pageSize" style="padding: 6px 12px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #a0aec0; cursor: pointer">下一页</button>
     </div>
 
-    <n-modal
-      v-model:show="showModal"
-      preset="dialog"
-      :title="editingId ? '编辑事件' : '新建事件'"
-      positive-text="提交"
-      negative-text="取消"
-      :loading="submitting"
-      @positive-click="handleSubmit"
-      style="width: 540px"
-    >
-      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
-        <n-form-item label="事件标题" path="eventTitle">
-          <n-input v-model:value="form.eventTitle" placeholder="事件标题" />
-        </n-form-item>
-        <n-form-item label="事件日期" path="eventDate">
-          <n-date-picker v-model:formatted-value="form.eventDate" type="date" value-format="yyyy-MM-dd" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="事件类型" path="eventType">
-          <n-select v-model:value="form.eventType" :options="eventTypeOptions" placeholder="选择类型" />
-        </n-form-item>
-        <n-form-item label="描述" path="description">
-          <n-input v-model:value="form.description" type="textarea" placeholder="事件描述" :rows="3" />
-        </n-form-item>
-      </n-form>
-    </n-modal>
+    <!-- 弹窗 -->
+    <div v-if="showDialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000">
+      <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 24px; width: 540px; max-height: 80vh; overflow-y: auto">
+        <h3 style="color: #e0e0e0; margin-bottom: 20px">{{ editId ? '编辑' : '新增' }} 事件</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件标题 *</label>
+            <input v-model="form.eventTitle" placeholder="事件标题" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件日期 *</label>
+            <input v-model="form.eventDate" type="date" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件类型 *</label>
+            <select v-model="form.eventType" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box">
+              <option value="">请选择</option>
+              <option value="里程碑">里程碑</option>
+              <option value="突破">突破</option>
+              <option value="学习">学习</option>
+              <option value="项目">项目</option>
+              <option value="反思">反思</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">描述</label>
+            <textarea v-model="form.description" placeholder="事件描述" rows="3" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; resize: vertical; box-sizing: border-box"></textarea>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px">
+          <button @click="showDialog = false" style="padding: 8px 20px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #a0aec0; cursor: pointer">取消</button>
+          <button @click="handleSave" :disabled="saving" style="padding: 8px 20px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">{{ saving ? '保存中...' : '保存' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import {
-  NButton, NPagination, NModal, NForm, NFormItem,
-  NInput, NDatePicker, NSelect, NCard, NTag, NSpace,
-  NPopconfirm, NSpin, NEmpty, useMessage,
-} from 'naive-ui'
-import type { FormInst, FormRules } from 'naive-ui'
 import { timelineApi } from '../api'
 
-const message = useMessage()
-
-const list = ref<any[]>([])
 const loading = ref(false)
+const saving = ref(false)
+const showDialog = ref(false)
+const list = ref<any[]>([])
+const total = ref(0)
 const page = ref(1)
-const totalPages = ref(1)
-
-const showModal = ref(false)
-const submitting = ref(false)
-const editingId = ref<number | string | null>(null)
-const formRef = ref<FormInst | null>(null)
+const pageSize = 20
+const editId = ref<number | string | null>(null)
 
 const form = ref({
   eventTitle: '',
@@ -99,200 +99,98 @@ const form = ref({
   description: '',
 })
 
-const rules: FormRules = {
-  eventTitle: { required: true, message: '请输入事件标题', trigger: 'blur' },
-  eventDate: { required: true, message: '请选择日期', trigger: 'blur' },
-  eventType: { required: true, message: '请选择类型', trigger: 'change' },
+const dotColorMap: Record<string, string> = {
+  '里程碑': '#18a058',
+  '突破': '#e94560',
+  '学习': '#2080f0',
+  '项目': '#f0a020',
+  '反思': '#8b5cf6',
 }
 
-const eventTypeOptions = [
-  { label: '里程碑', value: '里程碑' },
-  { label: '突破', value: '突破' },
-  { label: '学习', value: '学习' },
-  { label: '项目', value: '项目' },
-  { label: '反思', value: '反思' },
-  { label: '其他', value: '其他' },
-]
-
-function eventTypeClass(type: string): string {
-  const map: Record<string, string> = {
-    '里程碑': 'dot-milestone',
-    '突破': 'dot-breakthrough',
-    '学习': 'dot-study',
-    '项目': 'dot-project',
-    '反思': 'dot-reflection',
-  }
-  return map[type] || 'dot-default'
+const tagColorMap: Record<string, { background: string; color: string }> = {
+  '里程碑': { background: 'rgba(24,160,88,0.15)', color: '#18a058' },
+  '突破': { background: 'rgba(233,69,96,0.15)', color: '#e94560' },
+  '学习': { background: 'rgba(32,128,240,0.15)', color: '#2080f0' },
+  '项目': { background: 'rgba(240,160,32,0.15)', color: '#f0a020' },
+  '反思': { background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' },
 }
 
-function eventTypeTag(type: string): 'success' | 'warning' | 'info' | 'error' | 'default' {
-  const map: Record<string, 'success' | 'warning' | 'info' | 'error' | 'default'> = {
-    '里程碑': 'success',
-    '突破': 'warning',
-    '学习': 'info',
-    '项目': 'info',
-    '反思': 'warning',
-  }
-  return map[type] || 'default'
+function dotColor(type: string): string {
+  return dotColorMap[type] || '#8b949e'
 }
 
-async function fetchList() {
+function tagStyle(type: string) {
+  return tagColorMap[type] || { background: 'rgba(139,148,158,0.15)', color: '#8b949e' }
+}
+
+async function loadData() {
   loading.value = true
   try {
-    const res = await timelineApi.list({ page: page.value, pageSize: 20 }) as any
+    const params: any = { skip: (page.value - 1) * pageSize, limit: pageSize }
+    const res = await timelineApi.list(params) as any
     list.value = res.items ?? res.data ?? res ?? []
-    totalPages.value = res.totalPages ?? 1
+    total.value = res.total ?? 0
   } catch (err: any) {
-    message.error(err?.data?.message || '加载失败')
+    alert(err?.data?.message || '加载失败')
   } finally {
     loading.value = false
   }
 }
 
-function openCreate() {
-  editingId.value = null
-  form.value = { eventTitle: '', eventDate: new Date().toISOString().split('T')[0], eventType: '', description: '' }
-  showModal.value = true
-}
-
-function openEdit(row: any) {
-  editingId.value = row.id
-  form.value = {
-    eventTitle: row.eventTitle ?? '',
-    eventDate: row.eventDate ?? '',
-    eventType: row.eventType ?? '',
-    description: row.description ?? '',
+function openDialog(row?: any) {
+  if (row) {
+    editId.value = row.id
+    form.value = {
+      eventTitle: row.eventTitle ?? '',
+      eventDate: row.eventDate ?? '',
+      eventType: row.eventType ?? '',
+      description: row.description ?? '',
+    }
+  } else {
+    editId.value = null
+    form.value = { eventTitle: '', eventDate: new Date().toISOString().split('T')[0], eventType: '', description: '' }
   }
-  showModal.value = true
+  showDialog.value = true
 }
 
-async function handleSubmit() {
+async function handleSave() {
+  if (!form.value.eventTitle.trim()) {
+    alert('请输入事件标题')
+    return
+  }
+  if (!form.value.eventDate) {
+    alert('请选择日期')
+    return
+  }
+  if (!form.value.eventType) {
+    alert('请选择类型')
+    return
+  }
+  saving.value = true
   try {
-    await formRef.value?.validate()
-    submitting.value = true
-    if (editingId.value) {
-      await timelineApi.update(editingId.value, form.value)
-      message.success('更新成功')
+    if (editId.value) {
+      await timelineApi.update(editId.value, form.value)
     } else {
       await timelineApi.create(form.value)
-      message.success('创建成功')
     }
-    showModal.value = false
-    fetchList()
+    showDialog.value = false
+    loadData()
   } catch (err: any) {
-    if (err?.data?.message) message.error(err.data.message)
+    alert(err?.data?.message || '保存失败')
   } finally {
-    submitting.value = false
+    saving.value = false
   }
 }
 
 async function handleDelete(id: number | string) {
+  if (!confirm('确认删除？')) return
   try {
     await timelineApi.remove(id)
-    message.success('删除成功')
-    fetchList()
+    loadData()
   } catch (err: any) {
-    message.error(err?.data?.message || '删除失败')
+    alert(err?.data?.message || '删除失败')
   }
 }
 
-onMounted(() => fetchList())
+onMounted(() => loadData())
 </script>
-
-<style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #e0e0e0;
-}
-
-.loading-wrap, .empty-wrap {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 200px;
-}
-
-.timeline-list {
-  position: relative;
-  padding-left: 24px;
-}
-
-.timeline-list::before {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.timeline-item {
-  position: relative;
-  margin-bottom: 16px;
-}
-
-.timeline-dot {
-  position: absolute;
-  left: -20px;
-  top: 14px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid #161b22;
-  z-index: 1;
-}
-
-.dot-milestone { background: #18a058; }
-.dot-breakthrough { background: #e94560; }
-.dot-study { background: #2080f0; }
-.dot-project { background: #f0a020; }
-.dot-reflection { background: #8b5cf6; }
-.dot-default { background: #8b949e; }
-
-.timeline-card {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.timeline-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.timeline-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #e0e0e0;
-}
-
-.timeline-date {
-  font-size: 13px;
-  color: #8b949e;
-}
-
-.timeline-desc {
-  font-size: 14px;
-  color: #c0c0c0;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-</style>

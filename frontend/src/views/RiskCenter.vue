@@ -1,56 +1,56 @@
 <template>
-  <div class="page">
-    <h2 class="page-title">风险中心</h2>
+  <div>
+    <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">风险中心</h2>
 
-    <n-grid :cols="3" :x-gap="16" :y-gap="16" responsive="screen" item-responsive style="margin-bottom: 24px">
-      <n-gi span="3 m:1">
-        <n-card class="stat-card">
-          <n-statistic label="风险等级">
-            <span :style="{ color: riskColor, fontSize: '24px', fontWeight: 700 }">
-              {{ riskStatus.level || '加载中...' }}
-            </span>
-          </n-statistic>
-        </n-card>
-      </n-gi>
-      <n-gi span="3 m:1">
-        <n-card class="stat-card">
-          <n-statistic label="停滞天数">
-            <n-number-animation :from="0" :to="riskStatus.stagnationDays ?? 0" />
-            <template #suffix>天</template>
-          </n-statistic>
-        </n-card>
-      </n-gi>
-      <n-gi span="3 m:1">
-        <n-card class="stat-card">
-          <n-statistic label="告警数">
-            <n-number-animation :from="0" :to="alerts.length" />
-          </n-statistic>
-        </n-card>
-      </n-gi>
-    </n-grid>
+    <!-- 状态卡片 -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px">
+      <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 20px">
+        <div style="color: #a0aec0; font-size: 14px; margin-bottom: 8px">风险等级</div>
+        <div :style="{ color: riskColor, fontSize: '24px', fontWeight: 700 }">{{ riskStatus.level || '加载中...' }}</div>
+      </div>
+      <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 20px">
+        <div style="color: #a0aec0; font-size: 14px; margin-bottom: 8px">停滞天数</div>
+        <div style="color: #e0e0e0; font-size: 24px; font-weight: 700">{{ riskStatus.stagnationDays ?? 0 }} 天</div>
+      </div>
+      <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 20px">
+        <div style="color: #a0aec0; font-size: 14px; margin-bottom: 8px">告警数</div>
+        <div style="color: #e0e0e0; font-size: 24px; font-weight: 700">{{ alerts.length }}</div>
+      </div>
+    </div>
 
-    <n-card title="资产停滞详情" class="section-card" style="margin-bottom: 16px">
-      <n-data-table
-        :columns="alertColumns"
-        :data="alerts"
-        :loading="loading"
-        :bordered="false"
-        size="small"
-      />
-    </n-card>
+    <!-- 告警表格 -->
+    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
+      <div style="padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06)">
+        <span style="color: #e0e0e0; font-weight: 600; font-size: 15px">资产停滞详情</span>
+      </div>
+      <table style="width: 100%; border-collapse: collapse">
+        <thead>
+          <tr style="background: #1a1a2e">
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">资产类型</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">天数</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">状态</th>
+            <th style="padding: 12px 16px; text-align: left; color: #a0aec0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06)">详情</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in alerts" :key="item.assetType" style="border-bottom: 1px solid rgba(255,255,255,0.06)">
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.assetType }}</td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.days }}</td>
+            <td style="padding: 12px 16px">
+              <span :style="{ padding: '2px 8px', borderRadius: '4px', fontSize: '12px', ...alertStatusStyle(item.days) }">{{ alertStatusLabel(item.days) }}</span>
+            </td>
+            <td style="padding: 12px 16px; color: #e0e0e0">{{ item.detail }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!alerts.length && !loading" style="padding: 40px; text-align: center; color: #a0aec0">暂无告警</div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
-import {
-  NGrid, NGi, NCard, NStatistic, NNumberAnimation,
-  NDataTable, NTag, useMessage,
-} from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import { ref, computed, onMounted } from 'vue'
 import { riskApi } from '../api'
-
-const message = useMessage()
 
 const loading = ref(false)
 const riskStatus = ref<any>({})
@@ -66,19 +66,17 @@ const riskColor = computed(() => {
   return map[riskStatus.value.level] || '#8b949e'
 })
 
-const alertColumns: DataTableColumns<any> = [
-  { title: '资产类型', key: 'assetType', width: 120 },
-  { title: '天数', key: 'days', width: 80 },
-  {
-    title: '状态', key: 'status', width: 100,
-    render(row) {
-      const type = row.days > 14 ? 'error' : row.days > 7 ? 'warning' : 'success'
-      const label = row.days > 14 ? '严重' : row.days > 7 ? '警告' : '正常'
-      return h(NTag, { size: 'small', type: type as any, bordered: false }, { default: () => label })
-    },
-  },
-  { title: '详情', key: 'detail', ellipsis: { tooltip: true } },
-]
+function alertStatusLabel(days: number): string {
+  if (days > 14) return '严重'
+  if (days > 7) return '警告'
+  return '正常'
+}
+
+function alertStatusStyle(days: number) {
+  if (days > 14) return { background: 'rgba(233,69,96,0.15)', color: '#e94560' }
+  if (days > 7) return { background: 'rgba(240,160,32,0.15)', color: '#f0a020' }
+  return { background: 'rgba(24,160,88,0.15)', color: '#18a058' }
+}
 
 onMounted(async () => {
   loading.value = true
@@ -90,28 +88,9 @@ onMounted(async () => {
     riskStatus.value = (statusRes as any) ?? {}
     alerts.value = (alertsRes as any) ?? []
   } catch (err: any) {
-    message.error(err?.data?.message || '加载失败')
+    alert(err?.data?.message || '加载失败')
   } finally {
     loading.value = false
   }
 })
 </script>
-
-<style scoped>
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #e0e0e0;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.section-card {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-</style>
