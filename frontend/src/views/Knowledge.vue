@@ -12,13 +12,14 @@
 
     <el-table :data="list" stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="title" label="标题" show-overflow-tooltip />
+      <el-table-column prop="question" label="问题" show-overflow-tooltip />
+      <el-table-column prop="answer" label="答案" show-overflow-tooltip />
       <el-table-column prop="category" label="分类" width="120">
         <template #default="{ row }">
           <el-tag>{{ row.category || '-' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="content" label="内容" show-overflow-tooltip />
+      <el-table-column prop="scenario" label="应用场景" show-overflow-tooltip />
       <el-table-column prop="created_at" label="创建时间" width="170" />
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
@@ -36,22 +37,19 @@
       v-model:current-page="currentPage" @current-change="loadList"
     />
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑知识卡片' : '新增知识卡片'" width="600px" destroy-on-close>
-      <el-form :model="form" label-width="80px">
-        <el-form-item label="标题">
-          <el-input v-model="form.title" placeholder="知识标题" />
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑知识卡片' : '新增知识卡片'" width="700px" destroy-on-close>
+      <el-form :model="form" label-width="100px">
+        <el-form-item label="问题">
+          <el-input v-model="form.question" placeholder="知识点的问题" />
+        </el-form-item>
+        <el-form-item label="答案">
+          <el-input v-model="form.answer" type="textarea" :rows="6" placeholder="知识点的答案" />
         </el-form-item>
         <el-form-item label="分类">
-          <el-input v-model="form.category" placeholder="知识分类" />
+          <el-input v-model="form.category" placeholder="如：Linux、数据库、网络" />
         </el-form-item>
-        <el-form-item label="内容">
-          <el-input v-model="form.content" type="textarea" :rows="6" placeholder="知识内容" />
-        </el-form-item>
-        <el-form-item label="来源">
-          <el-input v-model="form.source" placeholder="知识来源" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="form.tags" placeholder="标签，用逗号分隔" />
+        <el-form-item label="应用场景">
+          <el-input v-model="form.scenario" type="textarea" :rows="3" placeholder="在什么场景下会用到" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -76,16 +74,17 @@ const dialogVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
 
-const form = reactive({ title: '', category: '', content: '', source: '', tags: '' })
+const form = reactive({ question: '', answer: '', category: '', scenario: '' })
 
 const resetForm = () => {
-  Object.assign(form, { title: '', category: '', content: '', source: '', tags: '' })
+  Object.assign(form, { question: '', answer: '', category: '', scenario: '' })
   editingId.value = null
 }
 
 const loadList = async () => {
   try {
-    const res = await getKnowledge({ page: currentPage.value, page_size: pageSize.value, search: search.value })
+    const skip = (currentPage.value - 1) * pageSize.value
+    const res = await getKnowledge({ skip, limit: pageSize.value, search: search.value })
     list.value = res.items || res.data || res || []
     total.value = res.total || list.value.length
   } catch (e) { /* silent */ }
@@ -96,15 +95,16 @@ const openDialog = (row = null) => {
   if (row) {
     editingId.value = row.id
     Object.assign(form, {
-      title: row.title || '', category: row.category || '',
-      content: row.content || '', source: row.source || '', tags: row.tags || ''
+      question: row.question || '', answer: row.answer || '',
+      category: row.category || '', scenario: row.scenario || ''
     })
   }
   dialogVisible.value = true
 }
 
 const handleSave = async () => {
-  if (!form.title.trim()) { ElMessage.warning('请输入标题'); return }
+  if (!form.question.trim()) { ElMessage.warning('请输入问题'); return }
+  if (!form.answer.trim()) { ElMessage.warning('请输入答案'); return }
   try {
     saving.value = true
     if (editingId.value) {

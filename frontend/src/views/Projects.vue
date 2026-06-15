@@ -13,13 +13,14 @@
     <el-table :data="list" stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="项目名称" show-overflow-tooltip />
-      <el-table-column prop="status" label="状态" width="120">
+      <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)">{{ row.status || '进行中' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="tech_stack" label="技术栈" show-overflow-tooltip />
+      <el-table-column prop="version" label="版本" width="80" />
       <el-table-column prop="description" label="描述" show-overflow-tooltip />
+      <el-table-column prop="github_url" label="GitHub" width="120" show-overflow-tooltip />
       <el-table-column prop="updated_at" label="更新时间" width="170" />
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
@@ -37,28 +38,37 @@
       v-model:current-page="currentPage" @current-change="loadList"
     />
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑项目' : '新增项目'" width="600px" destroy-on-close>
-      <el-form :model="form" label-width="80px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑项目' : '新增项目'" width="700px" destroy-on-close>
+      <el-form :model="form" label-width="100px">
         <el-form-item label="项目名">
           <el-input v-model="form.name" placeholder="项目名称" />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="form.status" style="width: 100%">
-            <el-option label="规划中" value="规划中" />
-            <el-option label="进行中" value="进行中" />
-            <el-option label="已暂停" value="已暂停" />
-            <el-option label="已完成" value="已完成" />
-            <el-option label="已归档" value="已归档" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="技术栈">
-          <el-input v-model="form.tech_stack" placeholder="如：Vue3, Python, PostgreSQL" />
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="状态">
+              <el-select v-model="form.status" style="width: 100%">
+                <el-option label="规划中" value="规划中" />
+                <el-option label="进行中" value="进行中" />
+                <el-option label="已暂停" value="已暂停" />
+                <el-option label="已完成" value="已完成" />
+                <el-option label="已归档" value="已归档" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="版本">
+              <el-input v-model="form.version" placeholder="如：v1.0.0" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="GitHub 地址">
+          <el-input v-model="form.github_url" placeholder="https://github.com/..." />
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" :rows="4" placeholder="项目描述" />
         </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="form.tags" placeholder="标签，用逗号分隔" />
+        <el-form-item label="下一步计划">
+          <el-input v-model="form.next_plan" type="textarea" :rows="3" placeholder="接下来要做什么" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -88,16 +98,17 @@ const dialogVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
 
-const form = reactive({ name: '', status: '进行中', tech_stack: '', description: '', tags: '' })
+const form = reactive({ name: '', description: '', github_url: '', status: '进行中', version: '', next_plan: '' })
 
 const resetForm = () => {
-  Object.assign(form, { name: '', status: '进行中', tech_stack: '', description: '', tags: '' })
+  Object.assign(form, { name: '', description: '', github_url: '', status: '进行中', version: '', next_plan: '' })
   editingId.value = null
 }
 
 const loadList = async () => {
   try {
-    const res = await getProjects({ page: currentPage.value, page_size: pageSize.value, search: search.value })
+    const skip = (currentPage.value - 1) * pageSize.value
+    const res = await getProjects({ skip, limit: pageSize.value, search: search.value })
     list.value = res.items || res.data || res || []
     total.value = res.total || list.value.length
   } catch (e) { /* silent */ }
@@ -108,8 +119,9 @@ const openDialog = (row = null) => {
   if (row) {
     editingId.value = row.id
     Object.assign(form, {
-      name: row.name || '', status: row.status || '进行中',
-      tech_stack: row.tech_stack || '', description: row.description || '', tags: row.tags || ''
+      name: row.name || '', description: row.description || '',
+      github_url: row.github_url || '', status: row.status || '进行中',
+      version: row.version || '', next_plan: row.next_plan || ''
     })
   }
   dialogVisible.value = true

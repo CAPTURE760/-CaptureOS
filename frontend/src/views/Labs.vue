@@ -13,13 +13,10 @@
     <el-table :data="list" stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="title" label="实验标题" show-overflow-tooltip />
-      <el-table-column prop="status" label="状态" width="120">
-        <template #default="{ row }">
-          <el-tag :type="statusType(row.status)">{{ row.status || '进行中' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="hypothesis" label="假设" show-overflow-tooltip />
-      <el-table-column prop="conclusion" label="结论" show-overflow-tooltip />
+      <el-table-column prop="goal" label="目标" show-overflow-tooltip />
+      <el-table-column prop="environment" label="环境" width="140" show-overflow-tooltip />
+      <el-table-column prop="result" label="结果" show-overflow-tooltip />
+      <el-table-column prop="summary" label="总结" show-overflow-tooltip />
       <el-table-column prop="created_at" label="创建时间" width="170" />
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
@@ -37,29 +34,28 @@
       v-model:current-page="currentPage" @current-change="loadList"
     />
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑实验' : '新增实验'" width="600px" destroy-on-close>
-      <el-form :model="form" label-width="80px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑实验' : '新增实验'" width="700px" destroy-on-close>
+      <el-form :model="form" label-width="100px">
         <el-form-item label="标题">
           <el-input v-model="form.title" placeholder="实验标题" />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="form.status" style="width: 100%">
-            <el-option label="进行中" value="进行中" />
-            <el-option label="已完成" value="已完成" />
-            <el-option label="已放弃" value="已放弃" />
-          </el-select>
+        <el-form-item label="实验目标">
+          <el-input v-model="form.goal" type="textarea" :rows="2" placeholder="这次实验要验证什么" />
         </el-form-item>
-        <el-form-item label="假设">
-          <el-input v-model="form.hypothesis" type="textarea" :rows="3" placeholder="实验假设" />
+        <el-form-item label="实验环境">
+          <el-input v-model="form.environment" placeholder="如：Ubuntu 22.04, Python 3.11" />
         </el-form-item>
-        <el-form-item label="过程记录">
-          <el-input v-model="form.process" type="textarea" :rows="4" placeholder="实验过程" />
+        <el-form-item label="实验步骤">
+          <el-input v-model="form.steps" type="textarea" :rows="4" placeholder="详细的实验步骤" />
         </el-form-item>
-        <el-form-item label="结论">
-          <el-input v-model="form.conclusion" type="textarea" :rows="3" placeholder="实验结论" />
+        <el-form-item label="实验结果">
+          <el-input v-model="form.result" type="textarea" :rows="3" placeholder="实验结果" />
         </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="form.tags" placeholder="标签，用逗号分隔" />
+        <el-form-item label="踩坑记录">
+          <el-input v-model="form.pitfalls" type="textarea" :rows="2" placeholder="过程中遇到的问题" />
+        </el-form-item>
+        <el-form-item label="总结">
+          <el-input v-model="form.summary" type="textarea" :rows="3" placeholder="实验总结与收获" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -75,8 +71,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getLabs, createLab, updateLab, deleteLab } from '../api/labs'
 
-const statusType = (s) => ({ '已完成': 'success', '已放弃': 'info', '进行中': 'warning' }[s] || 'warning')
-
 const search = ref('')
 const list = ref([])
 const total = ref(0)
@@ -86,16 +80,17 @@ const dialogVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
 
-const form = reactive({ title: '', status: '进行中', hypothesis: '', process: '', conclusion: '', tags: '' })
+const form = reactive({ title: '', goal: '', environment: '', steps: '', result: '', pitfalls: '', summary: '' })
 
 const resetForm = () => {
-  Object.assign(form, { title: '', status: '进行中', hypothesis: '', process: '', conclusion: '', tags: '' })
+  Object.assign(form, { title: '', goal: '', environment: '', steps: '', result: '', pitfalls: '', summary: '' })
   editingId.value = null
 }
 
 const loadList = async () => {
   try {
-    const res = await getLabs({ page: currentPage.value, page_size: pageSize.value, search: search.value })
+    const skip = (currentPage.value - 1) * pageSize.value
+    const res = await getLabs({ skip, limit: pageSize.value, search: search.value })
     list.value = res.items || res.data || res || []
     total.value = res.total || list.value.length
   } catch (e) { /* silent */ }
@@ -106,9 +101,8 @@ const openDialog = (row = null) => {
   if (row) {
     editingId.value = row.id
     Object.assign(form, {
-      title: row.title || '', status: row.status || '进行中',
-      hypothesis: row.hypothesis || '', process: row.process || '',
-      conclusion: row.conclusion || '', tags: row.tags || ''
+      title: row.title || '', goal: row.goal || '', environment: row.environment || '',
+      steps: row.steps || '', result: row.result || '', pitfalls: row.pitfalls || '', summary: row.summary || ''
     })
   }
   dialogVisible.value = true
@@ -116,6 +110,7 @@ const openDialog = (row = null) => {
 
 const handleSave = async () => {
   if (!form.title.trim()) { ElMessage.warning('请输入标题'); return }
+  if (!form.goal.trim()) { ElMessage.warning('请输入实验目标'); return }
   try {
     saving.value = true
     if (editingId.value) {

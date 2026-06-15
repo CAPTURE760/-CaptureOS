@@ -13,11 +13,8 @@
     <el-table :data="list" stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="title" label="故障标题" show-overflow-tooltip />
-      <el-table-column prop="severity" label="严重程度" width="120">
-        <template #default="{ row }">
-          <el-tag :type="severityType(row.severity)">{{ row.severity || '-' }}</el-tag>
-        </template>
-      </el-table-column>
+      <el-table-column prop="environment" label="环境" width="120" show-overflow-tooltip />
+      <el-table-column prop="symptom" label="故障现象" show-overflow-tooltip />
       <el-table-column prop="root_cause" label="根因分析" show-overflow-tooltip />
       <el-table-column prop="solution" label="解决方案" show-overflow-tooltip />
       <el-table-column prop="created_at" label="创建时间" width="170" />
@@ -40,21 +37,16 @@
       @current-change="loadList"
     />
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑故障案例' : '新增故障案例'" width="600px" destroy-on-close>
-      <el-form :model="form" label-width="80px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑故障案例' : '新增故障案例'" width="700px" destroy-on-close>
+      <el-form :model="form" label-width="100px">
         <el-form-item label="标题">
           <el-input v-model="form.title" placeholder="故障标题" />
         </el-form-item>
-        <el-form-item label="严重程度">
-          <el-select v-model="form.severity" style="width: 100%">
-            <el-option label="低" value="低" />
-            <el-option label="中" value="中" />
-            <el-option label="高" value="高" />
-            <el-option label="严重" value="严重" />
-          </el-select>
+        <el-form-item label="运行环境">
+          <el-input v-model="form.environment" placeholder="如：CentOS 7.9 + MySQL 8.0" />
         </el-form-item>
-        <el-form-item label="现象描述">
-          <el-input v-model="form.description" type="textarea" :rows="3" placeholder="故障现象" />
+        <el-form-item label="故障现象">
+          <el-input v-model="form.symptom" type="textarea" :rows="3" placeholder="描述故障现象" />
         </el-form-item>
         <el-form-item label="根因分析">
           <el-input v-model="form.root_cause" type="textarea" :rows="3" placeholder="根因分析" />
@@ -62,8 +54,11 @@
         <el-form-item label="解决方案">
           <el-input v-model="form.solution" type="textarea" :rows="3" placeholder="解决方案" />
         </el-form-item>
+        <el-form-item label="预防措施">
+          <el-input v-model="form.prevention" type="textarea" :rows="2" placeholder="如何预防再次发生" />
+        </el-form-item>
         <el-form-item label="标签">
-          <el-input v-model="form.tags" placeholder="标签，用逗号分隔" />
+          <el-input v-model="tagsInput" placeholder="标签，用逗号分隔" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -79,11 +74,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getFaultCases, createFaultCase, updateFaultCase, deleteFaultCase } from '../api/faultCases'
 
-const severityType = (s) => {
-  const map = { '低': 'info', '中': 'warning', '高': 'danger', '严重': 'danger' }
-  return map[s] || 'info'
-}
-
 const search = ref('')
 const list = ref([])
 const total = ref(0)
@@ -92,19 +82,22 @@ const pageSize = ref(15)
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
+const tagsInput = ref('')
 
 const form = reactive({
-  title: '', severity: '中', description: '', root_cause: '', solution: '', tags: ''
+  title: '', environment: '', symptom: '', root_cause: '', solution: '', prevention: ''
 })
 
 const resetForm = () => {
-  Object.assign(form, { title: '', severity: '中', description: '', root_cause: '', solution: '', tags: '' })
+  Object.assign(form, { title: '', environment: '', symptom: '', root_cause: '', solution: '', prevention: '' })
+  tagsInput.value = ''
   editingId.value = null
 }
 
 const loadList = async () => {
   try {
-    const res = await getFaultCases({ page: currentPage.value, page_size: pageSize.value, search: search.value })
+    const skip = (currentPage.value - 1) * pageSize.value
+    const res = await getFaultCases({ skip, limit: pageSize.value, search: search.value })
     list.value = res.items || res.data || res || []
     total.value = res.total || list.value.length
   } catch (e) { /* silent */ }
@@ -115,23 +108,26 @@ const openDialog = (row = null) => {
   if (row) {
     editingId.value = row.id
     Object.assign(form, {
-      title: row.title || '', severity: row.severity || '中',
-      description: row.description || '', root_cause: row.root_cause || '',
-      solution: row.solution || '', tags: row.tags || ''
+      title: row.title || '', environment: row.environment || '',
+      symptom: row.symptom || '', root_cause: row.root_cause || '',
+      solution: row.solution || '', prevention: row.prevention || ''
     })
+    tagsInput.value = (row.tags || []).join(', ')
   }
   dialogVisible.value = true
 }
 
 const handleSave = async () => {
   if (!form.title.trim()) { ElMessage.warning('请输入标题'); return }
+  const tags = tagsInput.value ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : []
   try {
     saving.value = true
+    const payload = { ...form, tags }
     if (editingId.value) {
-      await updateFaultCase(editingId.value, { ...form })
+      await updateFaultCase(editingId.value, payload)
       ElMessage.success('更新成功')
     } else {
-      await createFaultCase({ ...form })
+      await createFaultCase(payload)
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false

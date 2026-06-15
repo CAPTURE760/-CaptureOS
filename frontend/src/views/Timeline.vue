@@ -9,13 +9,13 @@
       <el-timeline-item
         v-for="item in list"
         :key="item.id"
-        :timestamp="item.date"
+        :timestamp="item.event_date"
         placement="top"
         :color="typeColor(item.event_type)"
       >
         <el-card class="timeline-card">
           <div class="timeline-header">
-            <h4>{{ item.title }}</h4>
+            <h4>{{ item.event_title }}</h4>
             <el-tag :type="tagType(item.event_type)" size="small">{{ item.event_type || '其他' }}</el-tag>
           </div>
           <p class="timeline-desc">{{ item.description }}</p>
@@ -38,10 +38,10 @@
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑事件' : '新增事件'" width="500px" destroy-on-close>
       <el-form :model="form" label-width="80px">
         <el-form-item label="标题">
-          <el-input v-model="form.title" placeholder="事件标题" />
+          <el-input v-model="form.event_title" placeholder="事件标题" />
         </el-form-item>
         <el-form-item label="日期">
-          <el-date-picker v-model="form.date" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
+          <el-date-picker v-model="form.event_date" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
         </el-form-item>
         <el-form-item label="类型">
           <el-select v-model="form.event_type" style="width: 100%">
@@ -89,18 +89,19 @@ const editingId = ref(null)
 const saving = ref(false)
 
 const form = reactive({
-  title: '', date: new Date().toISOString().slice(0, 10),
+  event_title: '', event_date: new Date().toISOString().slice(0, 10),
   event_type: '里程碑', description: ''
 })
 
 const resetForm = () => {
-  Object.assign(form, { title: '', date: new Date().toISOString().slice(0, 10), event_type: '里程碑', description: '' })
+  Object.assign(form, { event_title: '', event_date: new Date().toISOString().slice(0, 10), event_type: '里程碑', description: '' })
   editingId.value = null
 }
 
 const loadList = async () => {
   try {
-    const res = await getTimelineEvents({ page: currentPage.value, page_size: pageSize.value })
+    const skip = (currentPage.value - 1) * pageSize.value
+    const res = await getTimelineEvents({ skip, limit: pageSize.value })
     list.value = res.items || res.data || res || []
     total.value = res.total || list.value.length
   } catch (e) { /* silent */ }
@@ -111,7 +112,7 @@ const openDialog = (row = null) => {
   if (row) {
     editingId.value = row.id
     Object.assign(form, {
-      title: row.title || '', date: row.date || '',
+      event_title: row.event_title || '', event_date: row.event_date || '',
       event_type: row.event_type || '里程碑', description: row.description || ''
     })
   }
@@ -119,7 +120,7 @@ const openDialog = (row = null) => {
 }
 
 const handleSave = async () => {
-  if (!form.title.trim()) { ElMessage.warning('请输入标题'); return }
+  if (!form.event_title.trim()) { ElMessage.warning('请输入标题'); return }
   try {
     saving.value = true
     if (editingId.value) {
@@ -146,8 +147,8 @@ onMounted(loadList)
 
 <style scoped>
 .timeline-card {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background-color: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   margin-bottom: 4px;
 }
 
@@ -159,13 +160,13 @@ onMounted(loadList)
 }
 
 .timeline-header h4 {
-  color: var(--text-primary);
+  color: #e0e0e0;
   margin: 0;
   font-size: 16px;
 }
 
 .timeline-desc {
-  color: var(--text-secondary);
+  color: #a0aec0;
   margin: 8px 0;
   line-height: 1.6;
 }

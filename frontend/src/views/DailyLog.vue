@@ -28,10 +28,10 @@
           <el-input v-model="form.content" type="textarea" :rows="4" placeholder="记录今天的工作内容..." />
         </el-form-item>
         <el-form-item label="今日收获">
-          <el-input v-model="form.harvest" type="textarea" :rows="3" placeholder="今天学到了什么..." />
+          <el-input v-model="form.gain" type="textarea" :rows="3" placeholder="今天学到了什么..." />
         </el-form-item>
-        <el-form-item label="今日踩坑">
-          <el-input v-model="form.pitfall" type="textarea" :rows="3" placeholder="今天踩了什么坑..." />
+        <el-form-item label="今日问题">
+          <el-input v-model="form.problem" type="textarea" :rows="3" placeholder="今天遇到了什么问题..." />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSubmit" :loading="submitting">提交记录</el-button>
@@ -51,8 +51,8 @@
           </template>
         </el-table-column>
         <el-table-column prop="content" label="内容" show-overflow-tooltip />
-        <el-table-column prop="harvest" label="收获" show-overflow-tooltip />
-        <el-table-column prop="pitfall" label="踩坑" show-overflow-tooltip />
+        <el-table-column prop="gain" label="收获" show-overflow-tooltip />
+        <el-table-column prop="problem" label="问题" show-overflow-tooltip />
         <el-table-column label="操作" width="100">
           <template #default="{ row }">
             <el-button type="danger" link size="small" @click="handleDelete(row.id)">删除</el-button>
@@ -90,8 +90,8 @@ const form = reactive({
   date: new Date().toISOString().slice(0, 10),
   asset_type: 'work_case',
   content: '',
-  harvest: '',
-  pitfall: ''
+  gain: '',
+  problem: ''
 })
 
 const submitting = ref(false)
@@ -102,7 +102,8 @@ const pageSize = ref(10)
 
 const loadList = async () => {
   try {
-    const res = await getDailyLogs({ page: currentPage.value, page_size: pageSize.value })
+    const skip = (currentPage.value - 1) * pageSize.value
+    const res = await getDailyLogs({ skip, limit: pageSize.value })
     list.value = res.items || res.data || res || []
     total.value = res.total || list.value.length
   } catch (e) { /* silent */ }
@@ -118,8 +119,8 @@ const handleSubmit = async () => {
     await createDailyLog({ ...form })
     ElMessage.success('记录提交成功')
     form.content = ''
-    form.harvest = ''
-    form.pitfall = ''
+    form.gain = ''
+    form.problem = ''
     loadList()
   } finally {
     submitting.value = false

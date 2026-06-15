@@ -11,8 +11,8 @@
           <el-icon :size="64"><Monitor /></el-icon>
         </div>
         <div class="status-info">
-          <h1>{{ status.label || '正常' }}</h1>
-          <p class="status-desc">{{ status.description || '系统运行正常' }}</p>
+          <h1>{{ status.emoji }} {{ status.level || '正常' }}</h1>
+          <p class="status-desc">{{ status.message || '系统运行正常' }}</p>
         </div>
       </div>
     </div>
@@ -21,13 +21,13 @@
     <div class="card-row card-row-2" style="margin-top: 20px">
       <div class="stat-card">
         <div class="stat-icon"><el-icon><AlarmClock /></el-icon></div>
-        <div class="stat-value">{{ status.stagnation_days || 0 }}</div>
+        <div class="stat-value">{{ status.stagnation_days ?? '-' }}</div>
         <div class="stat-label">资产停滞天数</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon"><el-icon><Calendar /></el-icon></div>
-        <div class="stat-value">{{ status.last_asset_date || '-' }}</div>
-        <div class="stat-label">最近新增资产时间</div>
+        <div class="stat-value">{{ maxStagnation }}</div>
+        <div class="stat-label">最长停滞天数</div>
       </div>
     </div>
 
@@ -38,37 +38,47 @@
         <div class="legend-item">
           <span class="dot green"></span>
           <span class="legend-label">正常</span>
-          <span class="legend-desc">7天内有过新增资产</span>
+          <span class="legend-desc">0-2天内有过新增资产</span>
         </div>
         <div class="legend-item">
           <span class="dot yellow"></span>
           <span class="legend-label">黄色预警</span>
-          <span class="legend-desc">7-14天未新增资产</span>
+          <span class="legend-desc">3-6天未新增资产</span>
         </div>
         <div class="legend-item">
           <span class="dot orange"></span>
           <span class="legend-label">橙色预警</span>
-          <span class="legend-desc">14-30天未新增资产</span>
+          <span class="legend-desc">7-13天未新增资产</span>
         </div>
         <div class="legend-item">
           <span class="dot red"></span>
           <span class="legend-label">红色预警</span>
-          <span class="legend-desc">超过30天未新增资产</span>
+          <span class="legend-desc">超过14天未新增资产</span>
         </div>
       </div>
     </el-card>
 
-    <!-- 告警列表 -->
+    <!-- 各资产类别停滞详情 -->
     <el-card style="margin-top: 20px">
-      <template #header><span>最近告警</span></template>
-      <el-table :data="alerts" stripe style="width: 100%">
-        <el-table-column prop="created_at" label="时间" width="170" />
-        <el-table-column prop="level" label="级别" width="100">
+      <template #header><span>各资产类别停滞详情</span></template>
+      <el-table :data="alertsList" stripe style="width: 100%">
+        <el-table-column prop="asset_type" label="资产类型" width="120" />
+        <el-table-column prop="stagnation_days" label="停滞天数" width="100">
           <template #default="{ row }">
-            <el-tag :type="alertType(row.level)">{{ row.level }}</el-tag>
+            <span>{{ row.stagnation_days ?? '从未记录' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="message" label="告警内容" />
+        <el-table-column prop="last_activity" label="最近活动" width="120" />
+        <el-table-column prop="status" label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="riskTagType(row.risk?.color)">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="建议" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.risk?.message || '-' }}
+          </template>
+        </el-table-column>
       </el-table>
     </el-card>
   </div>
@@ -79,28 +89,28 @@ import { ref, computed, onMounted } from 'vue'
 import { getStatus, getAlerts } from '../api/risk'
 
 const status = ref({})
-const alerts = ref([])
+const alertsData = ref({})
+const maxStagnation = ref('-')
+
+const alertsList = computed(() => alertsData.value.alerts || [])
 
 const statusClass = computed(() => {
-  const level = status.value.level || 'normal'
-  const map = {
-    normal: 'status-green',
-    yellow: 'status-yellow',
-    orange: 'status-orange',
-    red: 'status-red'
-  }
-  return map[level] || 'status-green'
+  const color = status.value.color || 'green'
+  return `status-${color}`
 })
 
-const alertType = (level) => ({
-  '黄色': 'warning', '橙色': 'danger', '红色': 'danger', '正常': 'success'
-}[level] || 'info')
+const riskTagType = (color) => ({
+  green: 'success', yellow: 'warning', orange: 'danger', red: 'danger'
+}[color] || 'info')
 
 const loadData = async () => {
   try {
     const [s, a] = await Promise.allSettled([getStatus(), getAlerts()])
-    if (s.status === 'fulfilled') status.value = s.value
-    if (a.status === 'fulfilled') alerts.value = a.value || []
+    if (s.status === 'fulfilled') status.value = s.value?.data || {}
+    if (a.status === 'fulfilled') {
+      alertsData.value = a.value?.data || {}
+      maxStagnation.value = alertsData.value.max_stagnation_days ?? '-'
+    }
   } catch (e) { /* silent */ }
 }
 
@@ -150,11 +160,11 @@ onMounted(loadData)
   font-size: 36px;
   font-weight: 700;
   margin: 0;
-  color: var(--text-primary);
+  color: #e0e0e0;
 }
 
 .status-desc {
-  color: var(--text-secondary);
+  color: #a0aec0;
   font-size: 16px;
   margin-top: 8px;
 }
@@ -189,13 +199,13 @@ onMounted(loadData)
 .dot.red { background-color: #e94560; }
 
 .legend-label {
-  color: var(--text-primary);
+  color: #e0e0e0;
   font-weight: 500;
   min-width: 80px;
 }
 
 .legend-desc {
-  color: var(--text-muted);
+  color: #a0aec0;
   font-size: 13px;
 }
 </style>

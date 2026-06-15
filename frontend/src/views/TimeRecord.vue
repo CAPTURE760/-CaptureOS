@@ -131,7 +131,8 @@ const chartOptions = {
 
 const loadList = async () => {
   try {
-    const res = await getTimeRecords({ page: currentPage.value, page_size: pageSize.value })
+    const skip = (currentPage.value - 1) * pageSize.value
+    const res = await getTimeRecords({ skip, limit: pageSize.value })
     list.value = res.items || res.data || res || []
     total.value = res.total || list.value.length
   } catch (e) { /* silent */ }
