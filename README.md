@@ -56,15 +56,18 @@ docker compose up -d --build
 #### Windows (PowerShell)
 
 ```powershell
-# 后端
+# 先进入项目目录
+cd CaptureOS
+
+# === 启动后端 ===
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 
-# 前端（另开一个终端）
-cd frontend
+# === 启动前端（另开一个终端） ===
+cd CaptureOS\frontend
 npm install
 npm run dev
 ```
@@ -72,15 +75,18 @@ npm run dev
 #### Linux / macOS
 
 ```bash
-# 后端
+# 先进入项目目录
+cd CaptureOS
+
+# === 启动后端 ===
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 
-# 前端（另开一个终端）
-cd frontend
+# === 启动前端（另开一个终端） ===
+cd CaptureOS/frontend
 npm install
 npm run dev
 ```
