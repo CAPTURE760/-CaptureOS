@@ -130,8 +130,9 @@ async function loadData() {
     const params: any = { skip: (page.value - 1) * pageSize, limit: pageSize }
     if (search.value) params.search = search.value
     const res = await workCasesApi.list(params) as any
-    list.value = res.items ?? res.data ?? res ?? []
-    total.value = res.total ?? 0
+    const d = res.data ?? res
+    list.value = d.items ?? d ?? []
+    total.value = d.total ?? 0
   } catch (err: any) {
     alert(err?.data?.message || '加载失败')
   } finally {

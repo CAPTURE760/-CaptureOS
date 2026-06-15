@@ -85,8 +85,9 @@ onMounted(async () => {
       riskApi.status(),
       riskApi.alerts(),
     ])
-    riskStatus.value = (statusRes as any) ?? {}
-    alerts.value = (alertsRes as any) ?? []
+    riskStatus.value = (statusRes as any)?.data ?? {}
+    const alertsData = (alertsRes as any)?.data ?? {}
+    alerts.value = alertsData.alerts ?? []
   } catch (err: any) {
     alert(err?.data?.message || '加载失败')
   } finally {
