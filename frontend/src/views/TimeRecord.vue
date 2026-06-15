@@ -1,165 +1,189 @@
 <template>
-  <div class="time-record">
+  <div class="page">
     <div class="page-header">
-      <h2>时间流向</h2>
+      <h2 class="page-title">时间流向</h2>
+      <n-space>
+        <n-input v-model:value="search" placeholder="搜索..." clearable style="width: 200px" @clear="fetchList" @keyup.enter="fetchList" />
+        <n-button type="primary" @click="openCreate">+ 记录时间</n-button>
+      </n-space>
     </div>
 
-    <el-card class="form-card">
-      <el-form :model="form" label-width="100px">
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="日期">
-              <el-date-picker v-model="form.date" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="工作(小时)">
-              <el-input-number v-model="form.work_hours" :min="0" :max="24" :precision="1" :step="0.5" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="学习(小时)">
-              <el-input-number v-model="form.study_hours" :min="0" :max="24" :precision="1" :step="0.5" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="项目(小时)">
-              <el-input-number v-model="form.project_hours" :min="0" :max="24" :precision="1" :step="0.5" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="娱乐(小时)">
-              <el-input-number v-model="form.entertainment_hours" :min="0" :max="24" :precision="1" :step="0.5" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="其他(小时)">
-              <el-input-number v-model="form.other_hours" :min="0" :max="24" :precision="1" :step="0.5" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">提交记录</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+    <n-data-table
+      :columns="columns"
+      :data="list"
+      :loading="loading"
+      :bordered="false"
+      class="data-table"
+    />
 
-    <!-- 图表 -->
-    <div class="chart-container" style="margin-top: 20px">
-      <h3>最近7天时间分配</h3>
-      <Bar :data="chartData" :options="chartOptions" v-if="chartData.labels" />
-      <div v-else class="chart-placeholder">暂无数据</div>
+    <div class="pagination-wrap">
+      <n-pagination v-model:page="page" :page-count="totalPages" @update:page="fetchList" />
     </div>
 
-    <!-- 历史列表 -->
-    <el-card style="margin-top: 20px">
-      <template #header><span>历史记录</span></template>
-      <el-table :data="list" stripe style="width: 100%">
-        <el-table-column prop="date" label="日期" width="120" />
-        <el-table-column prop="work_hours" label="工作" width="80" />
-        <el-table-column prop="study_hours" label="学习" width="80" />
-        <el-table-column prop="project_hours" label="项目" width="80" />
-        <el-table-column prop="entertainment_hours" label="娱乐" width="80" />
-        <el-table-column prop="other_hours" label="其他" width="80" />
-        <el-table-column label="操作" width="100">
-          <template #default="{ row }">
-            <el-button type="danger" link size="small" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination
-        v-if="total > pageSize"
-        style="margin-top: 16px; justify-content: flex-end"
-        background layout="prev, pager, next"
-        :total="total" :page-size="pageSize"
-        v-model:current-page="currentPage" @current-change="loadList"
-      />
-    </el-card>
+    <n-modal
+      v-model:show="showModal"
+      preset="dialog"
+      title="记录时间"
+      positive-text="提交"
+      negative-text="取消"
+      :loading="submitting"
+      @positive-click="handleSubmit"
+      style="width: 500px"
+    >
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
+        <n-form-item label="日期" path="date">
+          <n-date-picker v-model:formatted-value="form.date" type="date" value-format="yyyy-MM-dd" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="工作时长" path="workHours">
+          <n-input-number v-model:value="form.workHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="学习时长" path="studyHours">
+          <n-input-number v-model:value="form.studyHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="项目时长" path="projectHours">
+          <n-input-number v-model:value="form.projectHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="娱乐时长" path="entertainmentHours">
+          <n-input-number v-model:value="form.entertainmentHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="其他时长" path="otherHours">
+          <n-input-number v-model:value="form.otherHours" :min="0" :max="24" :step="0.5" style="width: 100%" />
+        </n-form-item>
+      </n-form>
+    </n-modal>
   </div>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Bar } from 'vue-chartjs'
+<script setup lang="ts">
+import { ref, h, onMounted } from 'vue'
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend
-} from 'chart.js'
-import { getTimeRecords, createTimeRecord, deleteTimeRecord } from '../api/timeRecords'
+  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
+  NDatePicker, NInputNumber, NInput, NSpace, NPopconfirm, useMessage,
+} from 'naive-ui'
+import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { timeRecordsApi } from '../api'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+const message = useMessage()
 
-const form = reactive({
-  date: new Date().toISOString().slice(0, 10),
-  work_hours: 0, study_hours: 0, project_hours: 0,
-  entertainment_hours: 0, other_hours: 0
-})
+const list = ref<any[]>([])
+const loading = ref(false)
+const page = ref(1)
+const totalPages = ref(1)
+const search = ref('')
 
+const showModal = ref(false)
 const submitting = ref(false)
-const list = ref([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
+const formRef = ref<FormInst | null>(null)
 
-const chartData = computed(() => {
-  if (!list.value.length) return {}
-  const recent = list.value.slice(0, 7).reverse()
-  return {
-    labels: recent.map(d => d.date),
-    datasets: [
-      { label: '工作', data: recent.map(d => d.work_hours), backgroundColor: '#e94560' },
-      { label: '学习', data: recent.map(d => d.study_hours), backgroundColor: '#0f3460' },
-      { label: '项目', data: recent.map(d => d.project_hours), backgroundColor: '#53a8b6' },
-      { label: '娱乐', data: recent.map(d => d.entertainment_hours), backgroundColor: '#f5a623' },
-      { label: '其他', data: recent.map(d => d.other_hours), backgroundColor: '#7c4dff' }
-    ]
-  }
+const form = ref({
+  date: new Date().toISOString().split('T')[0],
+  workHours: 0,
+  studyHours: 0,
+  projectHours: 0,
+  entertainmentHours: 0,
+  otherHours: 0,
 })
 
-const chartOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { labels: { color: '#a0aec0' } } },
-  scales: {
-    x: { stacked: true, ticks: { color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-    y: { stacked: true, ticks: { color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+const rules: FormRules = {
+  date: { required: true, message: '请选择日期', trigger: 'blur' },
+}
+
+const columns: DataTableColumns<any> = [
+  { title: '日期', key: 'date', width: 120 },
+  { title: '工作', key: 'workHours', width: 80 },
+  { title: '学习', key: 'studyHours', width: 80 },
+  { title: '项目', key: 'projectHours', width: 80 },
+  { title: '娱乐', key: 'entertainmentHours', width: 80 },
+  { title: '其他', key: 'otherHours', width: 80 },
+  {
+    title: '操作', key: 'actions', width: 80,
+    render(row) {
+      return h(NPopconfirm, { onPositiveClick: () => handleDelete(row.id) }, {
+        trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
+        default: () => '确认删除？',
+      })
+    },
+  },
+]
+
+async function fetchList() {
+  loading.value = true
+  try {
+    const params: any = { page: page.value, pageSize: 20 }
+    if (search.value) params.search = search.value
+    const res = await timeRecordsApi.list(params) as any
+    list.value = res.items ?? res.data ?? res ?? []
+    totalPages.value = res.totalPages ?? 1
+  } catch (err: any) {
+    message.error(err?.data?.message || '加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
-const loadList = async () => {
-  try {
-    const skip = (currentPage.value - 1) * pageSize.value
-    const res = await getTimeRecords({ skip, limit: pageSize.value })
-    list.value = res.items || res.data || res || []
-    total.value = res.total || list.value.length
-  } catch (e) { /* silent */ }
+function openCreate() {
+  form.value = {
+    date: new Date().toISOString().split('T')[0],
+    workHours: 0,
+    studyHours: 0,
+    projectHours: 0,
+    entertainmentHours: 0,
+    otherHours: 0,
+  }
+  showModal.value = true
 }
 
-const handleSubmit = async () => {
+async function handleSubmit() {
   try {
+    await formRef.value?.validate()
     submitting.value = true
-    await createTimeRecord({ ...form })
-    ElMessage.success('记录提交成功')
-    Object.assign(form, { work_hours: 0, study_hours: 0, project_hours: 0, entertainment_hours: 0, other_hours: 0 })
-    loadList()
-  } finally { submitting.value = false }
+    await timeRecordsApi.create(form.value)
+    message.success('创建成功')
+    showModal.value = false
+    fetchList()
+  } catch (err: any) {
+    if (err?.data?.message) message.error(err.data.message)
+  } finally {
+    submitting.value = false
+  }
 }
 
-const handleDelete = async (id) => {
-  await ElMessageBox.confirm('确定删除该记录？', '提示', { type: 'warning' })
-  await deleteTimeRecord(id)
-  ElMessage.success('删除成功')
-  loadList()
+async function handleDelete(id: number | string) {
+  try {
+    await timeRecordsApi.remove(id)
+    message.success('删除成功')
+    fetchList()
+  } catch (err: any) {
+    message.error(err?.data?.message || '删除失败')
+  }
 }
 
-onMounted(loadList)
+onMounted(() => fetchList())
 </script>
 
 <style scoped>
-.form-card { margin-bottom: 20px; }
-.chart-container { min-height: 300px; }
-.chart-placeholder { height: 250px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.data-table {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
 </style>

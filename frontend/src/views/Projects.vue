@@ -1,154 +1,221 @@
 <template>
-  <div class="projects">
+  <div class="page">
     <div class="page-header">
-      <h2>项目资产</h2>
+      <h2 class="page-title">项目资产</h2>
+      <n-space>
+        <n-input v-model:value="search" placeholder="搜索..." clearable style="width: 200px" @clear="fetchList" @keyup.enter="fetchList" />
+        <n-button type="primary" @click="openCreate">+ 新建</n-button>
+      </n-space>
     </div>
 
-    <div class="search-bar">
-      <el-input v-model="search" placeholder="搜索项目..." clearable style="width: 300px" @clear="loadList" @keyup.enter="loadList" />
-      <el-button type="primary" @click="loadList">搜索</el-button>
-      <el-button type="primary" @click="openDialog()">新增项目</el-button>
-    </div>
-
-    <el-table :data="list" stripe style="width: 100%">
-      <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="name" label="项目名称" show-overflow-tooltip />
-      <el-table-column prop="status" label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="statusType(row.status)">{{ row.status || '进行中' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="version" label="版本" width="80" />
-      <el-table-column prop="description" label="描述" show-overflow-tooltip />
-      <el-table-column prop="github_url" label="GitHub" width="120" show-overflow-tooltip />
-      <el-table-column prop="updated_at" label="更新时间" width="170" />
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <el-button type="primary" link size="small" @click="openDialog(row)">编辑</el-button>
-          <el-button type="danger" link size="small" @click="handleDelete(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-pagination
-      v-if="total > pageSize"
-      style="margin-top: 16px; justify-content: flex-end"
-      background layout="prev, pager, next"
-      :total="total" :page-size="pageSize"
-      v-model:current-page="currentPage" @current-change="loadList"
+    <n-data-table
+      :columns="columns"
+      :data="list"
+      :loading="loading"
+      :bordered="false"
+      class="data-table"
     />
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑项目' : '新增项目'" width="700px" destroy-on-close>
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="项目名">
-          <el-input v-model="form.name" placeholder="项目名称" />
-        </el-form-item>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="状态">
-              <el-select v-model="form.status" style="width: 100%">
-                <el-option label="规划中" value="规划中" />
-                <el-option label="进行中" value="进行中" />
-                <el-option label="已暂停" value="已暂停" />
-                <el-option label="已完成" value="已完成" />
-                <el-option label="已归档" value="已归档" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="版本">
-              <el-input v-model="form.version" placeholder="如：v1.0.0" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="GitHub 地址">
-          <el-input v-model="form.github_url" placeholder="https://github.com/..." />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" type="textarea" :rows="4" placeholder="项目描述" />
-        </el-form-item>
-        <el-form-item label="下一步计划">
-          <el-input v-model="form.next_plan" type="textarea" :rows="3" placeholder="接下来要做什么" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
-      </template>
-    </el-dialog>
+    <div class="pagination-wrap">
+      <n-pagination v-model:page="page" :page-count="totalPages" @update:page="fetchList" />
+    </div>
+
+    <n-modal
+      v-model:show="showModal"
+      preset="dialog"
+      :title="editingId ? '编辑项目' : '新建项目'"
+      positive-text="提交"
+      negative-text="取消"
+      :loading="submitting"
+      @positive-click="handleSubmit"
+      style="width: 640px"
+    >
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
+        <n-form-item label="名称" path="name">
+          <n-input v-model:value="form.name" placeholder="项目名称" />
+        </n-form-item>
+        <n-form-item label="描述" path="description">
+          <n-input v-model:value="form.description" type="textarea" placeholder="项目描述" :rows="3" />
+        </n-form-item>
+        <n-form-item label="GitHub" path="githubUrl">
+          <n-input v-model:value="form.githubUrl" placeholder="GitHub 地址" />
+        </n-form-item>
+        <n-form-item label="状态" path="status">
+          <n-select v-model:value="form.status" :options="statusOptions" placeholder="选择状态" />
+        </n-form-item>
+        <n-form-item label="版本" path="version">
+          <n-input v-model:value="form.version" placeholder="如: v1.0.0" />
+        </n-form-item>
+        <n-form-item label="后续计划" path="nextPlan">
+          <n-input v-model:value="form.nextPlan" type="textarea" placeholder="后续计划" :rows="2" />
+        </n-form-item>
+      </n-form>
+    </n-modal>
   </div>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { getProjects, createProject, updateProject, deleteProject } from '../api/projects'
+<script setup lang="ts">
+import { ref, h, onMounted } from 'vue'
+import {
+  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
+  NInput, NSelect, NSpace, NPopconfirm, NTag, useMessage,
+} from 'naive-ui'
+import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { projectsApi } from '../api'
 
-const statusType = (s) => ({
-  '已完成': 'success', '进行中': 'warning', '已暂停': 'danger',
-  '规划中': 'info', '已归档': 'info'
-}[s] || 'info')
+const message = useMessage()
 
+const list = ref<any[]>([])
+const loading = ref(false)
+const page = ref(1)
+const totalPages = ref(1)
 const search = ref('')
-const list = ref([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(15)
-const dialogVisible = ref(false)
-const editingId = ref(null)
-const saving = ref(false)
 
-const form = reactive({ name: '', description: '', github_url: '', status: '进行中', version: '', next_plan: '' })
+const showModal = ref(false)
+const submitting = ref(false)
+const editingId = ref<number | string | null>(null)
+const formRef = ref<FormInst | null>(null)
 
-const resetForm = () => {
-  Object.assign(form, { name: '', description: '', github_url: '', status: '进行中', version: '', next_plan: '' })
-  editingId.value = null
+const form = ref({
+  name: '', description: '', githubUrl: '', status: '', version: '', nextPlan: '',
+})
+
+const rules: FormRules = {
+  name: { required: true, message: '请输入项目名称', trigger: 'blur' },
 }
 
-const loadList = async () => {
+const statusOptions = [
+  { label: '规划中', value: 'planning' },
+  { label: '进行中', value: 'active' },
+  { label: '已完成', value: 'completed' },
+  { label: '已归档', value: 'archived' },
+]
+
+const statusMap: Record<string, { label: string; type: 'default' | 'success' | 'warning' | 'info' | 'error' }> = {
+  planning: { label: '规划中', type: 'info' },
+  active: { label: '进行中', type: 'warning' },
+  completed: { label: '已完成', type: 'success' },
+  archived: { label: '已归档', type: 'default' },
+}
+
+const columns: DataTableColumns<any> = [
+  { title: '名称', key: 'name', ellipsis: { tooltip: true } },
+  { title: '描述', key: 'description', ellipsis: { tooltip: true } },
+  {
+    title: '状态', key: 'status', width: 90,
+    render(row) {
+      const s = statusMap[row.status]
+      if (!s) return row.status
+      return h(NTag, { size: 'small', type: s.type, bordered: false }, { default: () => s.label })
+    },
+  },
+  { title: '版本', key: 'version', width: 80 },
+  {
+    title: '操作', key: 'actions', width: 140,
+    render(row) {
+      return h(NSpace, { size: 'small' }, {
+        default: () => [
+          h(NButton, { size: 'small', quaternary: true, onClick: () => openEdit(row) }, { default: () => '编辑' }),
+          h(NPopconfirm, { onPositiveClick: () => handleDelete(row.id) }, {
+            trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
+            default: () => '确认删除？',
+          }),
+        ],
+      })
+    },
+  },
+]
+
+async function fetchList() {
+  loading.value = true
   try {
-    const skip = (currentPage.value - 1) * pageSize.value
-    const res = await getProjects({ skip, limit: pageSize.value, search: search.value })
-    list.value = res.items || res.data || res || []
-    total.value = res.total || list.value.length
-  } catch (e) { /* silent */ }
-}
-
-const openDialog = (row = null) => {
-  resetForm()
-  if (row) {
-    editingId.value = row.id
-    Object.assign(form, {
-      name: row.name || '', description: row.description || '',
-      github_url: row.github_url || '', status: row.status || '进行中',
-      version: row.version || '', next_plan: row.next_plan || ''
-    })
+    const params: any = { page: page.value, pageSize: 20 }
+    if (search.value) params.search = search.value
+    const res = await projectsApi.list(params) as any
+    list.value = res.items ?? res.data ?? res ?? []
+    totalPages.value = res.totalPages ?? 1
+  } catch (err: any) {
+    message.error(err?.data?.message || '加载失败')
+  } finally {
+    loading.value = false
   }
-  dialogVisible.value = true
 }
 
-const handleSave = async () => {
-  if (!form.name.trim()) { ElMessage.warning('请输入项目名'); return }
+function openCreate() {
+  editingId.value = null
+  form.value = { name: '', description: '', githubUrl: '', status: '', version: '', nextPlan: '' }
+  showModal.value = true
+}
+
+function openEdit(row: any) {
+  editingId.value = row.id
+  form.value = {
+    name: row.name ?? '',
+    description: row.description ?? '',
+    githubUrl: row.githubUrl ?? '',
+    status: row.status ?? '',
+    version: row.version ?? '',
+    nextPlan: row.nextPlan ?? '',
+  }
+  showModal.value = true
+}
+
+async function handleSubmit() {
   try {
-    saving.value = true
+    await formRef.value?.validate()
+    submitting.value = true
     if (editingId.value) {
-      await updateProject(editingId.value, { ...form })
-      ElMessage.success('更新成功')
+      await projectsApi.update(editingId.value, form.value)
+      message.success('更新成功')
     } else {
-      await createProject({ ...form })
-      ElMessage.success('创建成功')
+      await projectsApi.create(form.value)
+      message.success('创建成功')
     }
-    dialogVisible.value = false
-    loadList()
-  } finally { saving.value = false }
+    showModal.value = false
+    fetchList()
+  } catch (err: any) {
+    if (err?.data?.message) message.error(err.data.message)
+  } finally {
+    submitting.value = false
+  }
 }
 
-const handleDelete = async (id) => {
-  await ElMessageBox.confirm('确定删除该项目？', '提示', { type: 'warning' })
-  await deleteProject(id)
-  ElMessage.success('删除成功')
-  loadList()
+async function handleDelete(id: number | string) {
+  try {
+    await projectsApi.remove(id)
+    message.success('删除成功')
+    fetchList()
+  } catch (err: any) {
+    message.error(err?.data?.message || '删除失败')
+  }
 }
 
-onMounted(loadList)
+onMounted(() => fetchList())
 </script>
+
+<style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.data-table {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+</style>

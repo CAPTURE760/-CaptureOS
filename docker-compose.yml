@@ -6,11 +6,13 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./data/captureos.db
+      - DATABASE_URL=/app/data/captureos.db
+      - JWT_SECRET=${JWT_SECRET:-captureos-secret-change-in-production}
+      - PORT=8000
     expose:
       - "8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -22,15 +24,17 @@ services:
     restart: unless-stopped
     expose:
       - "80"
-
-  nginx:
-    build: ./nginx
-    container_name: captureos-nginx
-    restart: unless-stopped
-    ports:
-      - "3080:80"
     depends_on:
       backend:
         condition: service_healthy
-      frontend:
-        condition: service_started
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: captureos-caddy
+    restart: unless-stopped
+    ports:
+      - "3080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    depends_on:
+      - frontend

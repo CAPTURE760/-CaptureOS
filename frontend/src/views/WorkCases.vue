@@ -1,156 +1,220 @@
 <template>
-  <div class="work-cases">
+  <div class="page">
     <div class="page-header">
-      <h2>工作案例</h2>
+      <h2 class="page-title">工作案例</h2>
+      <n-space>
+        <n-input v-model:value="search" placeholder="搜索..." clearable style="width: 200px" @clear="fetchList" @keyup.enter="fetchList" />
+        <n-button type="primary" @click="openCreate">+ 新建</n-button>
+      </n-space>
     </div>
 
-    <div class="search-bar">
-      <el-input v-model="search" placeholder="搜索案例..." clearable style="width: 300px" @clear="loadList" @keyup.enter="loadList" />
-      <el-button type="primary" @click="loadList">搜索</el-button>
-      <el-button type="primary" @click="openDialog()">新增案例</el-button>
-    </div>
-
-    <el-table :data="list" stripe style="width: 100%">
-      <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="title" label="标题" show-overflow-tooltip />
-      <el-table-column prop="hospital_name" label="医院名称" width="140" show-overflow-tooltip />
-      <el-table-column prop="system_type" label="系统类型" width="120" />
-      <el-table-column prop="problem" label="问题" show-overflow-tooltip />
-      <el-table-column prop="solution" label="解决方案" show-overflow-tooltip />
-      <el-table-column prop="created_at" label="创建时间" width="170" />
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <el-button type="primary" link size="small" @click="openDialog(row)">编辑</el-button>
-          <el-button type="danger" link size="small" @click="handleDelete(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-pagination
-      v-if="total > pageSize"
-      style="margin-top: 16px; justify-content: flex-end"
-      background
-      layout="prev, pager, next"
-      :total="total"
-      :page-size="pageSize"
-      v-model:current-page="currentPage"
-      @current-change="loadList"
+    <n-data-table
+      :columns="columns"
+      :data="list"
+      :loading="loading"
+      :bordered="false"
+      class="data-table"
     />
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑案例' : '新增案例'" width="700px" destroy-on-close>
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="标题">
-          <el-input v-model="form.title" placeholder="案例标题" />
-        </el-form-item>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="医院名称">
-              <el-input v-model="form.hospital_name" placeholder="医院名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="系统类型">
-              <el-input v-model="form.system_type" placeholder="如：HIS、LIS、PACS" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="遇到的问题">
-          <el-input v-model="form.problem" type="textarea" :rows="3" placeholder="描述遇到的问题" />
-        </el-form-item>
-        <el-form-item label="原因分析">
-          <el-input v-model="form.reason" type="textarea" :rows="3" placeholder="问题原因分析" />
-        </el-form-item>
-        <el-form-item label="解决方案">
-          <el-input v-model="form.solution" type="textarea" :rows="3" placeholder="解决方案" />
-        </el-form-item>
-        <el-form-item label="耗时">
-          <el-input v-model="form.cost_time" placeholder="如：2小时" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="tagsInput" placeholder="标签，用逗号分隔" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
-      </template>
-    </el-dialog>
+    <div class="pagination-wrap">
+      <n-pagination v-model:page="page" :page-count="totalPages" @update:page="fetchList" />
+    </div>
+
+    <n-modal
+      v-model:show="showModal"
+      preset="dialog"
+      :title="editingId ? '编辑工作案例' : '新建工作案例'"
+      positive-text="提交"
+      negative-text="取消"
+      :loading="submitting"
+      @positive-click="handleSubmit"
+      style="width: 640px"
+    >
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
+        <n-form-item label="标题" path="title">
+          <n-input v-model:value="form.title" placeholder="案例标题" />
+        </n-form-item>
+        <n-form-item label="医院名称" path="hospitalName">
+          <n-input v-model:value="form.hospitalName" placeholder="医院名称" />
+        </n-form-item>
+        <n-form-item label="系统类型" path="systemType">
+          <n-input v-model:value="form.systemType" placeholder="系统类型" />
+        </n-form-item>
+        <n-form-item label="问题描述" path="problem">
+          <n-input v-model:value="form.problem" type="textarea" placeholder="问题描述" :rows="2" />
+        </n-form-item>
+        <n-form-item label="原因分析" path="reason">
+          <n-input v-model:value="form.reason" type="textarea" placeholder="原因分析" :rows="2" />
+        </n-form-item>
+        <n-form-item label="解决方案" path="solution">
+          <n-input v-model:value="form.solution" type="textarea" placeholder="解决方案" :rows="2" />
+        </n-form-item>
+        <n-form-item label="耗时" path="costTime">
+          <n-input v-model:value="form.costTime" placeholder="耗时(如: 2小时)" />
+        </n-form-item>
+        <n-form-item label="标签" path="tags">
+          <n-input v-model:value="form.tags" placeholder="逗号分隔，如: 网络,交换机" />
+        </n-form-item>
+      </n-form>
+    </n-modal>
   </div>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { getWorkCases, createWorkCase, updateWorkCase, deleteWorkCase } from '../api/workCases'
+<script setup lang="ts">
+import { ref, h, onMounted } from 'vue'
+import {
+  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
+  NInput, NSpace, NPopconfirm, useMessage,
+} from 'naive-ui'
+import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { workCasesApi } from '../api'
 
+const message = useMessage()
+
+const list = ref<any[]>([])
+const loading = ref(false)
+const page = ref(1)
+const totalPages = ref(1)
 const search = ref('')
-const list = ref([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(15)
-const dialogVisible = ref(false)
-const editingId = ref(null)
-const saving = ref(false)
-const tagsInput = ref('')
 
-const form = reactive({
-  title: '', hospital_name: '', system_type: '',
-  problem: '', reason: '', solution: '', cost_time: ''
+const showModal = ref(false)
+const submitting = ref(false)
+const editingId = ref<number | string | null>(null)
+const formRef = ref<FormInst | null>(null)
+
+const form = ref({
+  title: '', hospitalName: '', systemType: '', problem: '',
+  reason: '', solution: '', costTime: '', tags: '',
 })
 
-const resetForm = () => {
-  Object.assign(form, { title: '', hospital_name: '', system_type: '', problem: '', reason: '', solution: '', cost_time: '' })
-  tagsInput.value = ''
-  editingId.value = null
+const rules: FormRules = {
+  title: { required: true, message: '请输入标题', trigger: 'blur' },
 }
 
-const loadList = async () => {
+const columns: DataTableColumns<any> = [
+  { title: '标题', key: 'title', ellipsis: { tooltip: true } },
+  { title: '医院', key: 'hospitalName', ellipsis: { tooltip: true } },
+  { title: '系统', key: 'systemType', width: 100 },
+  { title: '耗时', key: 'costTime', width: 80 },
+  {
+    title: '标签', key: 'tags', width: 150,
+    render(row) {
+      const tags = Array.isArray(row.tags) ? row.tags : (row.tags ? String(row.tags).split(',') : [])
+      return tags.map((t: string) => t.trim()).filter(Boolean).join(', ')
+    },
+  },
+  {
+    title: '操作', key: 'actions', width: 140,
+    render(row) {
+      return h(NSpace, { size: 'small' }, {
+        default: () => [
+          h(NButton, { size: 'small', quaternary: true, onClick: () => openEdit(row) }, { default: () => '编辑' }),
+          h(NPopconfirm, { onPositiveClick: () => handleDelete(row.id) }, {
+            trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
+            default: () => '确认删除？',
+          }),
+        ],
+      })
+    },
+  },
+]
+
+async function fetchList() {
+  loading.value = true
   try {
-    const skip = (currentPage.value - 1) * pageSize.value
-    const res = await getWorkCases({ skip, limit: pageSize.value, search: search.value })
-    list.value = res.items || res.data || res || []
-    total.value = res.total || list.value.length
-  } catch (e) { /* silent */ }
-}
-
-const openDialog = (row = null) => {
-  resetForm()
-  if (row) {
-    editingId.value = row.id
-    Object.assign(form, {
-      title: row.title || '', hospital_name: row.hospital_name || '',
-      system_type: row.system_type || '', problem: row.problem || '',
-      reason: row.reason || '', solution: row.solution || '', cost_time: row.cost_time || ''
-    })
-    tagsInput.value = (row.tags || []).join(', ')
+    const params: any = { page: page.value, pageSize: 20 }
+    if (search.value) params.search = search.value
+    const res = await workCasesApi.list(params) as any
+    list.value = res.items ?? res.data ?? res ?? []
+    totalPages.value = res.totalPages ?? 1
+  } catch (err: any) {
+    message.error(err?.data?.message || '加载失败')
+  } finally {
+    loading.value = false
   }
-  dialogVisible.value = true
 }
 
-const handleSave = async () => {
-  if (!form.title.trim()) { ElMessage.warning('请输入标题'); return }
-  const tags = tagsInput.value ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : []
+function openCreate() {
+  editingId.value = null
+  form.value = { title: '', hospitalName: '', systemType: '', problem: '', reason: '', solution: '', costTime: '', tags: '' }
+  showModal.value = true
+}
+
+function openEdit(row: any) {
+  editingId.value = row.id
+  form.value = {
+    title: row.title ?? '',
+    hospitalName: row.hospitalName ?? '',
+    systemType: row.systemType ?? '',
+    problem: row.problem ?? '',
+    reason: row.reason ?? '',
+    solution: row.solution ?? '',
+    costTime: row.costTime ?? '',
+    tags: Array.isArray(row.tags) ? row.tags.join(',') : (row.tags ?? ''),
+  }
+  showModal.value = true
+}
+
+async function handleSubmit() {
   try {
-    saving.value = true
-    const payload = { ...form, tags }
-    if (editingId.value) {
-      await updateWorkCase(editingId.value, payload)
-      ElMessage.success('更新成功')
-    } else {
-      await createWorkCase(payload)
-      ElMessage.success('创建成功')
+    await formRef.value?.validate()
+    submitting.value = true
+    const data = {
+      ...form.value,
+      tags: form.value.tags ? form.value.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
     }
-    dialogVisible.value = false
-    loadList()
-  } finally { saving.value = false }
+    if (editingId.value) {
+      await workCasesApi.update(editingId.value, data)
+      message.success('更新成功')
+    } else {
+      await workCasesApi.create(data)
+      message.success('创建成功')
+    }
+    showModal.value = false
+    fetchList()
+  } catch (err: any) {
+    if (err?.data?.message) message.error(err.data.message)
+  } finally {
+    submitting.value = false
+  }
 }
 
-const handleDelete = async (id) => {
-  await ElMessageBox.confirm('确定删除该案例？', '提示', { type: 'warning' })
-  await deleteWorkCase(id)
-  ElMessage.success('删除成功')
-  loadList()
+async function handleDelete(id: number | string) {
+  try {
+    await workCasesApi.remove(id)
+    message.success('删除成功')
+    fetchList()
+  } catch (err: any) {
+    message.error(err?.data?.message || '删除失败')
+  }
 }
 
-onMounted(loadList)
+onMounted(() => fetchList())
 </script>
+
+<style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.data-table {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+</style>

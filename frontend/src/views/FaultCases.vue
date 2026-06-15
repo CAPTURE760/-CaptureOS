@@ -1,146 +1,209 @@
 <template>
-  <div class="fault-cases">
+  <div class="page">
     <div class="page-header">
-      <h2>故障案例</h2>
+      <h2 class="page-title">故障案例</h2>
+      <n-space>
+        <n-input v-model:value="search" placeholder="搜索..." clearable style="width: 200px" @clear="fetchList" @keyup.enter="fetchList" />
+        <n-button type="primary" @click="openCreate">+ 新建</n-button>
+      </n-space>
     </div>
 
-    <div class="search-bar">
-      <el-input v-model="search" placeholder="搜索故障案例..." clearable style="width: 300px" @clear="loadList" @keyup.enter="loadList" />
-      <el-button type="primary" @click="loadList">搜索</el-button>
-      <el-button type="primary" @click="openDialog()">新增案例</el-button>
-    </div>
-
-    <el-table :data="list" stripe style="width: 100%">
-      <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="title" label="故障标题" show-overflow-tooltip />
-      <el-table-column prop="environment" label="环境" width="120" show-overflow-tooltip />
-      <el-table-column prop="symptom" label="故障现象" show-overflow-tooltip />
-      <el-table-column prop="root_cause" label="根因分析" show-overflow-tooltip />
-      <el-table-column prop="solution" label="解决方案" show-overflow-tooltip />
-      <el-table-column prop="created_at" label="创建时间" width="170" />
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <el-button type="primary" link size="small" @click="openDialog(row)">编辑</el-button>
-          <el-button type="danger" link size="small" @click="handleDelete(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-pagination
-      v-if="total > pageSize"
-      style="margin-top: 16px; justify-content: flex-end"
-      background
-      layout="prev, pager, next"
-      :total="total"
-      :page-size="pageSize"
-      v-model:current-page="currentPage"
-      @current-change="loadList"
+    <n-data-table
+      :columns="columns"
+      :data="list"
+      :loading="loading"
+      :bordered="false"
+      class="data-table"
     />
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑故障案例' : '新增故障案例'" width="700px" destroy-on-close>
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="标题">
-          <el-input v-model="form.title" placeholder="故障标题" />
-        </el-form-item>
-        <el-form-item label="运行环境">
-          <el-input v-model="form.environment" placeholder="如：CentOS 7.9 + MySQL 8.0" />
-        </el-form-item>
-        <el-form-item label="故障现象">
-          <el-input v-model="form.symptom" type="textarea" :rows="3" placeholder="描述故障现象" />
-        </el-form-item>
-        <el-form-item label="根因分析">
-          <el-input v-model="form.root_cause" type="textarea" :rows="3" placeholder="根因分析" />
-        </el-form-item>
-        <el-form-item label="解决方案">
-          <el-input v-model="form.solution" type="textarea" :rows="3" placeholder="解决方案" />
-        </el-form-item>
-        <el-form-item label="预防措施">
-          <el-input v-model="form.prevention" type="textarea" :rows="2" placeholder="如何预防再次发生" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="tagsInput" placeholder="标签，用逗号分隔" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
-      </template>
-    </el-dialog>
+    <div class="pagination-wrap">
+      <n-pagination v-model:page="page" :page-count="totalPages" @update:page="fetchList" />
+    </div>
+
+    <n-modal
+      v-model:show="showModal"
+      preset="dialog"
+      :title="editingId ? '编辑故障案例' : '新建故障案例'"
+      positive-text="提交"
+      negative-text="取消"
+      :loading="submitting"
+      @positive-click="handleSubmit"
+      style="width: 640px"
+    >
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
+        <n-form-item label="标题" path="title">
+          <n-input v-model:value="form.title" placeholder="故障标题" />
+        </n-form-item>
+        <n-form-item label="环境" path="environment">
+          <n-input v-model:value="form.environment" placeholder="运行环境" />
+        </n-form-item>
+        <n-form-item label="症状" path="symptom">
+          <n-input v-model:value="form.symptom" type="textarea" placeholder="故障症状" :rows="2" />
+        </n-form-item>
+        <n-form-item label="根因" path="rootCause">
+          <n-input v-model:value="form.rootCause" type="textarea" placeholder="根本原因" :rows="2" />
+        </n-form-item>
+        <n-form-item label="解决方案" path="solution">
+          <n-input v-model:value="form.solution" type="textarea" placeholder="解决方案" :rows="2" />
+        </n-form-item>
+        <n-form-item label="预防措施" path="prevention">
+          <n-input v-model:value="form.prevention" type="textarea" placeholder="预防措施" :rows="2" />
+        </n-form-item>
+        <n-form-item label="标签" path="tags">
+          <n-input v-model:value="form.tags" placeholder="逗号分隔" />
+        </n-form-item>
+      </n-form>
+    </n-modal>
   </div>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { getFaultCases, createFaultCase, updateFaultCase, deleteFaultCase } from '../api/faultCases'
+<script setup lang="ts">
+import { ref, h, onMounted } from 'vue'
+import {
+  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
+  NInput, NSpace, NPopconfirm, useMessage,
+} from 'naive-ui'
+import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { faultCasesApi } from '../api'
 
+const message = useMessage()
+
+const list = ref<any[]>([])
+const loading = ref(false)
+const page = ref(1)
+const totalPages = ref(1)
 const search = ref('')
-const list = ref([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(15)
-const dialogVisible = ref(false)
-const editingId = ref(null)
-const saving = ref(false)
-const tagsInput = ref('')
 
-const form = reactive({
-  title: '', environment: '', symptom: '', root_cause: '', solution: '', prevention: ''
+const showModal = ref(false)
+const submitting = ref(false)
+const editingId = ref<number | string | null>(null)
+const formRef = ref<FormInst | null>(null)
+
+const form = ref({
+  title: '', environment: '', symptom: '', rootCause: '',
+  solution: '', prevention: '', tags: '',
 })
 
-const resetForm = () => {
-  Object.assign(form, { title: '', environment: '', symptom: '', root_cause: '', solution: '', prevention: '' })
-  tagsInput.value = ''
-  editingId.value = null
+const rules: FormRules = {
+  title: { required: true, message: '请输入标题', trigger: 'blur' },
 }
 
-const loadList = async () => {
+const columns: DataTableColumns<any> = [
+  { title: '标题', key: 'title', ellipsis: { tooltip: true } },
+  { title: '环境', key: 'environment', ellipsis: { tooltip: true } },
+  { title: '症状', key: 'symptom', ellipsis: { tooltip: true } },
+  { title: '根因', key: 'rootCause', ellipsis: { tooltip: true } },
+  {
+    title: '操作', key: 'actions', width: 140,
+    render(row) {
+      return h(NSpace, { size: 'small' }, {
+        default: () => [
+          h(NButton, { size: 'small', quaternary: true, onClick: () => openEdit(row) }, { default: () => '编辑' }),
+          h(NPopconfirm, { onPositiveClick: () => handleDelete(row.id) }, {
+            trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
+            default: () => '确认删除？',
+          }),
+        ],
+      })
+    },
+  },
+]
+
+async function fetchList() {
+  loading.value = true
   try {
-    const skip = (currentPage.value - 1) * pageSize.value
-    const res = await getFaultCases({ skip, limit: pageSize.value, search: search.value })
-    list.value = res.items || res.data || res || []
-    total.value = res.total || list.value.length
-  } catch (e) { /* silent */ }
-}
-
-const openDialog = (row = null) => {
-  resetForm()
-  if (row) {
-    editingId.value = row.id
-    Object.assign(form, {
-      title: row.title || '', environment: row.environment || '',
-      symptom: row.symptom || '', root_cause: row.root_cause || '',
-      solution: row.solution || '', prevention: row.prevention || ''
-    })
-    tagsInput.value = (row.tags || []).join(', ')
+    const params: any = { page: page.value, pageSize: 20 }
+    if (search.value) params.search = search.value
+    const res = await faultCasesApi.list(params) as any
+    list.value = res.items ?? res.data ?? res ?? []
+    totalPages.value = res.totalPages ?? 1
+  } catch (err: any) {
+    message.error(err?.data?.message || '加载失败')
+  } finally {
+    loading.value = false
   }
-  dialogVisible.value = true
 }
 
-const handleSave = async () => {
-  if (!form.title.trim()) { ElMessage.warning('请输入标题'); return }
-  const tags = tagsInput.value ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : []
+function openCreate() {
+  editingId.value = null
+  form.value = { title: '', environment: '', symptom: '', rootCause: '', solution: '', prevention: '', tags: '' }
+  showModal.value = true
+}
+
+function openEdit(row: any) {
+  editingId.value = row.id
+  form.value = {
+    title: row.title ?? '',
+    environment: row.environment ?? '',
+    symptom: row.symptom ?? '',
+    rootCause: row.rootCause ?? '',
+    solution: row.solution ?? '',
+    prevention: row.prevention ?? '',
+    tags: Array.isArray(row.tags) ? row.tags.join(',') : (row.tags ?? ''),
+  }
+  showModal.value = true
+}
+
+async function handleSubmit() {
   try {
-    saving.value = true
-    const payload = { ...form, tags }
-    if (editingId.value) {
-      await updateFaultCase(editingId.value, payload)
-      ElMessage.success('更新成功')
-    } else {
-      await createFaultCase(payload)
-      ElMessage.success('创建成功')
+    await formRef.value?.validate()
+    submitting.value = true
+    const data = {
+      ...form.value,
+      tags: form.value.tags ? form.value.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
     }
-    dialogVisible.value = false
-    loadList()
-  } finally { saving.value = false }
+    if (editingId.value) {
+      await faultCasesApi.update(editingId.value, data)
+      message.success('更新成功')
+    } else {
+      await faultCasesApi.create(data)
+      message.success('创建成功')
+    }
+    showModal.value = false
+    fetchList()
+  } catch (err: any) {
+    if (err?.data?.message) message.error(err.data.message)
+  } finally {
+    submitting.value = false
+  }
 }
 
-const handleDelete = async (id) => {
-  await ElMessageBox.confirm('确定删除该案例？', '提示', { type: 'warning' })
-  await deleteFaultCase(id)
-  ElMessage.success('删除成功')
-  loadList()
+async function handleDelete(id: number | string) {
+  try {
+    await faultCasesApi.remove(id)
+    message.success('删除成功')
+    fetchList()
+  } catch (err: any) {
+    message.error(err?.data?.message || '删除失败')
+  }
 }
 
-onMounted(loadList)
+onMounted(() => fetchList())
 </script>
+
+<style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.data-table {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+</style>

@@ -1,144 +1,204 @@
 <template>
-  <div class="daily-log">
+  <div class="page">
     <div class="page-header">
-      <h2>今日记录</h2>
+      <h2 class="page-title">今日记录</h2>
+      <n-button type="primary" @click="openCreate">
+        + 新建记录
+      </n-button>
     </div>
 
-    <el-card class="form-card">
-      <el-form :model="form" label-width="100px">
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="日期">
-              <el-date-picker v-model="form.date" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="16">
-            <el-form-item label="资产类型">
-              <el-select v-model="form.asset_type" placeholder="选择类型" style="width: 100%">
-                <el-option label="工作案例" value="work_case" />
-                <el-option label="故障案例" value="fault_case" />
-                <el-option label="知识卡片" value="knowledge" />
-                <el-option label="实验记录" value="lab" />
-                <el-option label="项目进展" value="project" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="内容">
-          <el-input v-model="form.content" type="textarea" :rows="4" placeholder="记录今天的工作内容..." />
-        </el-form-item>
-        <el-form-item label="今日收获">
-          <el-input v-model="form.gain" type="textarea" :rows="3" placeholder="今天学到了什么..." />
-        </el-form-item>
-        <el-form-item label="今日问题">
-          <el-input v-model="form.problem" type="textarea" :rows="3" placeholder="今天遇到了什么问题..." />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">提交记录</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+    <n-data-table
+      :columns="columns"
+      :data="list"
+      :loading="loading"
+      :bordered="false"
+      class="data-table"
+    />
 
-    <el-card style="margin-top: 20px">
-      <template #header>
-        <span>历史记录</span>
-      </template>
-      <el-table :data="list" stripe style="width: 100%">
-        <el-table-column prop="date" label="日期" width="120" />
-        <el-table-column prop="asset_type" label="类型" width="120">
-          <template #default="{ row }">
-            <el-tag>{{ typeMap[row.asset_type] || row.asset_type }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="content" label="内容" show-overflow-tooltip />
-        <el-table-column prop="gain" label="收获" show-overflow-tooltip />
-        <el-table-column prop="problem" label="问题" show-overflow-tooltip />
-        <el-table-column label="操作" width="100">
-          <template #default="{ row }">
-            <el-button type="danger" link size="small" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination
-        v-if="total > pageSize"
-        style="margin-top: 16px; justify-content: flex-end"
-        background
-        layout="prev, pager, next"
-        :total="total"
-        :page-size="pageSize"
-        v-model:current-page="currentPage"
-        @current-change="loadList"
+    <div class="pagination-wrap">
+      <n-pagination
+        v-model:page="page"
+        :page-count="totalPages"
+        @update:page="fetchList"
       />
-    </el-card>
+    </div>
+
+    <n-modal
+      v-model:show="showModal"
+      preset="dialog"
+      title="新建今日记录"
+      positive-text="提交"
+      negative-text="取消"
+      :loading="submitting"
+      @positive-click="handleSubmit"
+      style="width: 600px"
+    >
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="80">
+        <n-form-item label="日期" path="date">
+          <n-date-picker v-model:formatted-value="form.date" type="date" value-format="yyyy-MM-dd" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="资产类型" path="assetType">
+          <n-select
+            v-model:value="form.assetType"
+            :options="assetTypeOptions"
+            placeholder="选择类型"
+          />
+        </n-form-item>
+        <n-form-item label="内容" path="content">
+          <n-input v-model:value="form.content" type="textarea" placeholder="今日记录内容" :rows="3" />
+        </n-form-item>
+        <n-form-item label="收获" path="gain">
+          <n-input v-model:value="form.gain" type="textarea" placeholder="今日收获" :rows="2" />
+        </n-form-item>
+        <n-form-item label="问题" path="problem">
+          <n-input v-model:value="form.problem" type="textarea" placeholder="遇到的问题" :rows="2" />
+        </n-form-item>
+      </n-form>
+    </n-modal>
   </div>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { getDailyLogs, createDailyLog, deleteDailyLog } from '../api/dailyLogs'
+<script setup lang="ts">
+import { ref, h, onMounted } from 'vue'
+import {
+  NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
+  NInput, NDatePicker, NSelect, NPopconfirm, NSpace, useMessage,
+} from 'naive-ui'
+import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
+import { dailyLogsApi } from '../api'
 
-const typeMap = {
-  work_case: '工作案例',
-  fault_case: '故障案例',
-  knowledge: '知识卡片',
-  lab: '实验记录',
-  project: '项目进展'
-}
+const message = useMessage()
 
-const form = reactive({
-  date: new Date().toISOString().slice(0, 10),
-  asset_type: 'work_case',
+const list = ref<any[]>([])
+const loading = ref(false)
+const page = ref(1)
+const totalPages = ref(1)
+
+const showModal = ref(false)
+const submitting = ref(false)
+const formRef = ref<FormInst | null>(null)
+
+const form = ref({
+  date: new Date().toISOString().split('T')[0],
+  assetType: '',
   content: '',
   gain: '',
-  problem: ''
+  problem: '',
 })
 
-const submitting = ref(false)
-const list = ref([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-
-const loadList = async () => {
-  try {
-    const skip = (currentPage.value - 1) * pageSize.value
-    const res = await getDailyLogs({ skip, limit: pageSize.value })
-    list.value = res.items || res.data || res || []
-    total.value = res.total || list.value.length
-  } catch (e) { /* silent */ }
+const rules: FormRules = {
+  date: { required: true, message: '请选择日期', trigger: 'blur' },
+  assetType: { required: true, message: '请选择资产类型', trigger: 'change' },
+  content: { required: true, message: '请输入内容', trigger: 'blur' },
 }
 
-const handleSubmit = async () => {
-  if (!form.content.trim()) {
-    ElMessage.warning('请输入记录内容')
-    return
-  }
+const assetTypeOptions = [
+  { label: '工作案例', value: 'work_case' },
+  { label: '故障案例', value: 'fault_case' },
+  { label: '实验', value: 'lab' },
+  { label: '知识', value: 'knowledge' },
+  { label: '项目', value: 'project' },
+  { label: '其他', value: 'other' },
+]
+
+const columns: DataTableColumns<any> = [
+  { title: '日期', key: 'date', width: 120 },
+  { title: '类型', key: 'assetType', width: 100 },
+  { title: '内容', key: 'content', ellipsis: { tooltip: true } },
+  { title: '收获', key: 'gain', ellipsis: { tooltip: true } },
+  { title: '问题', key: 'problem', ellipsis: { tooltip: true } },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 80,
+    render(row) {
+      return h(NPopconfirm, {
+        onPositiveClick: () => handleDelete(row.id),
+      }, {
+        trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true }, { default: () => '删除' }),
+        default: () => '确认删除？',
+      })
+    },
+  },
+]
+
+async function fetchList() {
+  loading.value = true
   try {
+    const res = await dailyLogsApi.list({ page: page.value, pageSize: 20 }) as any
+    list.value = res.items ?? res.data ?? res ?? []
+    totalPages.value = res.totalPages ?? 1
+  } catch (err: any) {
+    message.error(err?.data?.message || '加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function openCreate() {
+  form.value = {
+    date: new Date().toISOString().split('T')[0],
+    assetType: '',
+    content: '',
+    gain: '',
+    problem: '',
+  }
+  showModal.value = true
+}
+
+async function handleSubmit() {
+  try {
+    await formRef.value?.validate()
     submitting.value = true
-    await createDailyLog({ ...form })
-    ElMessage.success('记录提交成功')
-    form.content = ''
-    form.gain = ''
-    form.problem = ''
-    loadList()
+    await dailyLogsApi.create(form.value)
+    message.success('创建成功')
+    showModal.value = false
+    fetchList()
+  } catch (err: any) {
+    if (err?.data?.message) {
+      message.error(err.data.message)
+    }
   } finally {
     submitting.value = false
   }
 }
 
-const handleDelete = async (id) => {
-  await ElMessageBox.confirm('确定删除该记录？', '提示', { type: 'warning' })
-  await deleteDailyLog(id)
-  ElMessage.success('删除成功')
-  loadList()
+async function handleDelete(id: number | string) {
+  try {
+    await dailyLogsApi.remove(id)
+    message.success('删除成功')
+    fetchList()
+  } catch (err: any) {
+    message.error(err?.data?.message || '删除失败')
+  }
 }
 
-onMounted(loadList)
+onMounted(() => fetchList())
 </script>
 
 <style scoped>
-.form-card {
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.data-table {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>
