@@ -8,7 +8,10 @@
     </div>
 
     <!-- 加载中 -->
-    <div v-if="loading" style="display: flex; justify-content: center; align-items: center; min-height: 200px; color: #a0aec0">加载中...</div>
+    <div v-if="loading" style="text-align: center; padding: 40px; color: #a0aec0">
+      <div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite"></div>
+      <div style="margin-top: 8px">加载中...</div>
+    </div>
 
     <!-- 空状态 -->
     <div v-else-if="!list.length" style="display: flex; justify-content: center; align-items: center; min-height: 200px; color: #a0aec0">暂无事件</div>
@@ -48,10 +51,12 @@
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件标题 *</label>
             <input v-model="form.eventTitle" placeholder="事件标题" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+            <div v-if="errors.eventTitle" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.eventTitle }}</div>
           </div>
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件日期 *</label>
             <input v-model="form.eventDate" type="date" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+            <div v-if="errors.eventDate" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.eventDate }}</div>
           </div>
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">事件类型 *</label>
@@ -64,6 +69,7 @@
               <option value="反思">反思</option>
               <option value="其他">其他</option>
             </select>
+            <div v-if="errors.eventType" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.eventType }}</div>
           </div>
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">描述</label>
@@ -91,6 +97,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 20
 const editId = ref<number | string | null>(null)
+const errors = ref<Record<string, string>>({})
 
 const form = ref({
   eventTitle: '',
@@ -123,6 +130,14 @@ function tagStyle(type: string) {
   return tagColorMap[type] || { background: 'rgba(139,148,158,0.15)', color: '#8b949e' }
 }
 
+function validate(): boolean {
+  errors.value = {}
+  if (!form.value.eventTitle?.trim()) errors.value.eventTitle = '请输入事件标题'
+  if (!form.value.eventDate) errors.value.eventDate = '请选择日期'
+  if (!form.value.eventType) errors.value.eventType = '请选择类型'
+  return Object.keys(errors.value).length === 0
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -132,13 +147,14 @@ async function loadData() {
     list.value = d.items ?? d ?? []
     total.value = d.total ?? 0
   } catch (err: any) {
-    alert(err?.data?.message || '加载失败')
+    // 加载失败静默处理
   } finally {
     loading.value = false
   }
 }
 
 function openDialog(row?: any) {
+  errors.value = {}
   if (row) {
     editId.value = row.id
     form.value = {
@@ -155,18 +171,7 @@ function openDialog(row?: any) {
 }
 
 async function handleSave() {
-  if (!form.value.eventTitle.trim()) {
-    alert('请输入事件标题')
-    return
-  }
-  if (!form.value.eventDate) {
-    alert('请选择日期')
-    return
-  }
-  if (!form.value.eventType) {
-    alert('请选择类型')
-    return
-  }
+  if (!validate()) return
   saving.value = true
   try {
     if (editId.value) {
@@ -177,7 +182,7 @@ async function handleSave() {
     showDialog.value = false
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '保存失败')
+    // 保存失败静默处理
   } finally {
     saving.value = false
   }
@@ -189,7 +194,7 @@ async function handleDelete(id: number | string) {
     await timelineApi.remove(id)
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '删除失败')
+    // 删除失败静默处理
   }
 }
 
