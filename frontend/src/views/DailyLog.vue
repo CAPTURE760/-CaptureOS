@@ -33,7 +33,8 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
+      <div v-if="loading" style="text-align: center; padding: 40px; color: #a0aec0"><div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite"></div><div style="margin-top: 8px">加载中...</div></div>
+      <div v-else-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
     </div>
 
     <!-- 分页 -->
