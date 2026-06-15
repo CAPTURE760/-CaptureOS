@@ -3,127 +3,119 @@ import router from '../router'
 
 const api = ofetch.create({
   baseURL: '/api/v1',
-  onRequest({ options }: any) {
-    const token = localStorage.getItem('token')
-    if (token) {
-      options.headers = options.headers || {}
-      options.headers.Authorization = `Bearer ${token}`
+  headers: {} as Record<string, string>,
+})
+
+// 每次请求前自动附加 token
+const originalFetch = api
+const wrappedApi = ((url: string, opts: any = {}) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    opts.headers = {
+      ...opts.headers,
+      Authorization: `Bearer ${token}`,
     }
-  },
-  onResponseError({ response }) {
-    if (response.status === 401) {
+  }
+  return originalFetch(url, opts)
+}) as typeof api
+
+// 处理 401 错误
+export async function request(url: string, opts: any = {}) {
+  try {
+    return await wrappedApi(url, opts)
+  } catch (err: any) {
+    if (err?.response?.status === 401 || err?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('username')
       router.push('/login')
     }
-  },
-})
+    throw err
+  }
+}
 
 // Auth
 export const authApi = {
   login: (username: string, password: string) =>
-    api('/auth/login', { method: 'POST', body: { username, password } }),
+    request('/auth/login', { method: 'POST', body: { username, password } }),
   register: (username: string, password: string) =>
-    api('/auth/register', { method: 'POST', body: { username, password } }),
-  getMe: () => api('/auth/me'),
+    request('/auth/register', { method: 'POST', body: { username, password } }),
+  getMe: () => request('/auth/me'),
 }
 
 // Work Cases
 export const workCasesApi = {
-  list: (params?: Record<string, any>) => api('/work-cases', { params }),
-  create: (data: Record<string, any>) =>
-    api('/work-cases', { method: 'POST', body: data }),
-  update: (id: number | string, data: Record<string, any>) =>
-    api(`/work-cases/${id}`, { method: 'PUT', body: data }),
-  remove: (id: number | string) =>
-    api(`/work-cases/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/work-cases', { params }),
+  create: (data: Record<string, any>) => request('/work-cases', { method: 'POST', body: data }),
+  update: (id: number | string, data: Record<string, any>) => request(`/work-cases/${id}`, { method: 'PUT', body: data }),
+  remove: (id: number | string) => request(`/work-cases/${id}`, { method: 'DELETE' }),
 }
 
 // Fault Cases
 export const faultCasesApi = {
-  list: (params?: Record<string, any>) => api('/fault-cases', { params }),
-  create: (data: Record<string, any>) =>
-    api('/fault-cases', { method: 'POST', body: data }),
-  update: (id: number | string, data: Record<string, any>) =>
-    api(`/fault-cases/${id}`, { method: 'PUT', body: data }),
-  remove: (id: number | string) =>
-    api(`/fault-cases/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/fault-cases', { params }),
+  create: (data: Record<string, any>) => request('/fault-cases', { method: 'POST', body: data }),
+  update: (id: number | string, data: Record<string, any>) => request(`/fault-cases/${id}`, { method: 'PUT', body: data }),
+  remove: (id: number | string) => request(`/fault-cases/${id}`, { method: 'DELETE' }),
 }
 
 // Labs
 export const labsApi = {
-  list: (params?: Record<string, any>) => api('/labs', { params }),
-  create: (data: Record<string, any>) =>
-    api('/labs', { method: 'POST', body: data }),
-  update: (id: number | string, data: Record<string, any>) =>
-    api(`/labs/${id}`, { method: 'PUT', body: data }),
-  remove: (id: number | string) =>
-    api(`/labs/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/labs', { params }),
+  create: (data: Record<string, any>) => request('/labs', { method: 'POST', body: data }),
+  update: (id: number | string, data: Record<string, any>) => request(`/labs/${id}`, { method: 'PUT', body: data }),
+  remove: (id: number | string) => request(`/labs/${id}`, { method: 'DELETE' }),
 }
 
 // Knowledge
 export const knowledgeApi = {
-  list: (params?: Record<string, any>) => api('/knowledge-cards', { params }),
-  create: (data: Record<string, any>) =>
-    api('/knowledge-cards', { method: 'POST', body: data }),
-  update: (id: number | string, data: Record<string, any>) =>
-    api(`/knowledge-cards/${id}`, { method: 'PUT', body: data }),
-  remove: (id: number | string) =>
-    api(`/knowledge-cards/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/knowledge-cards', { params }),
+  create: (data: Record<string, any>) => request('/knowledge-cards', { method: 'POST', body: data }),
+  update: (id: number | string, data: Record<string, any>) => request(`/knowledge-cards/${id}`, { method: 'PUT', body: data }),
+  remove: (id: number | string) => request(`/knowledge-cards/${id}`, { method: 'DELETE' }),
 }
 
 // Projects
 export const projectsApi = {
-  list: (params?: Record<string, any>) => api('/projects', { params }),
-  create: (data: Record<string, any>) =>
-    api('/projects', { method: 'POST', body: data }),
-  update: (id: number | string, data: Record<string, any>) =>
-    api(`/projects/${id}`, { method: 'PUT', body: data }),
-  remove: (id: number | string) =>
-    api(`/projects/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/projects', { params }),
+  create: (data: Record<string, any>) => request('/projects', { method: 'POST', body: data }),
+  update: (id: number | string, data: Record<string, any>) => request(`/projects/${id}`, { method: 'PUT', body: data }),
+  remove: (id: number | string) => request(`/projects/${id}`, { method: 'DELETE' }),
 }
 
 // Daily Logs
 export const dailyLogsApi = {
-  list: (params?: Record<string, any>) => api('/daily-logs', { params }),
-  create: (data: Record<string, any>) =>
-    api('/daily-logs', { method: 'POST', body: data }),
-  remove: (id: number | string) =>
-    api(`/daily-logs/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/daily-logs', { params }),
+  create: (data: Record<string, any>) => request('/daily-logs', { method: 'POST', body: data }),
+  remove: (id: number | string) => request(`/daily-logs/${id}`, { method: 'DELETE' }),
 }
 
 // Time Records
 export const timeRecordsApi = {
-  list: (params?: Record<string, any>) => api('/time-records', { params }),
-  create: (data: Record<string, any>) =>
-    api('/time-records', { method: 'POST', body: data }),
-  remove: (id: number | string) =>
-    api(`/time-records/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/time-records', { params }),
+  create: (data: Record<string, any>) => request('/time-records', { method: 'POST', body: data }),
+  remove: (id: number | string) => request(`/time-records/${id}`, { method: 'DELETE' }),
 }
 
 // Timeline
 export const timelineApi = {
-  list: (params?: Record<string, any>) => api('/timeline', { params }),
-  create: (data: Record<string, any>) =>
-    api('/timeline', { method: 'POST', body: data }),
-  update: (id: number | string, data: Record<string, any>) =>
-    api(`/timeline/${id}`, { method: 'PUT', body: data }),
-  remove: (id: number | string) =>
-    api(`/timeline/${id}`, { method: 'DELETE' }),
+  list: (params?: Record<string, any>) => request('/timeline', { params }),
+  create: (data: Record<string, any>) => request('/timeline', { method: 'POST', body: data }),
+  update: (id: number | string, data: Record<string, any>) => request(`/timeline/${id}`, { method: 'PUT', body: data }),
+  remove: (id: number | string) => request(`/timeline/${id}`, { method: 'DELETE' }),
 }
 
 // Dashboard
 export const dashboardApi = {
-  getStats: () => api('/dashboard/stats'),
-  getToday: () => api('/dashboard/today'),
-  getStreak: () => api('/dashboard/streak'),
-  getStagnation: () => api('/dashboard/stagnation'),
-  getMonthlyTrend: () => api('/dashboard/monthly-trend'),
-  getCategoryRatio: () => api('/dashboard/category-ratio'),
+  getStats: () => request('/dashboard/stats'),
+  getToday: () => request('/dashboard/today'),
+  getStreak: () => request('/dashboard/streak'),
+  getStagnation: () => request('/dashboard/stagnation'),
+  getMonthlyTrend: () => request('/dashboard/monthly-trend'),
+  getCategoryRatio: () => request('/dashboard/category-ratio'),
 }
 
 // Risk
 export const riskApi = {
-  status: () => api('/risk/status'),
-  alerts: () => api('/risk/alerts'),
+  status: () => request('/risk/status'),
+  alerts: () => request('/risk/alerts'),
 }
