@@ -1,7 +1,10 @@
 <template>
   <div>
-    <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0; margin-bottom: 20px">驾驶舱</h2>
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px">
+      <h2 style="font-size: 22px; font-weight: 700; color: #e0e0e0">驾驶舱</h2>
+      <button @click="handleExport" style="padding: 8px 16px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #a0aec0; cursor: pointer">&#128230; 导出数据</button>
+    </div>
+    <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px">
       <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 20px">
         <div style="color: #a0aec0; font-size: 14px; margin-bottom: 8px">资产总数</div>
         <div style="color: #e0e0e0; font-size: 28px; font-weight: 700">{{ stats.total ?? 0 }}</div>
@@ -31,6 +34,24 @@ const today = ref<any>({})
 const streak = ref<any>({})
 const stagnation = ref<any>({})
 
+async function handleExport() {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await fetch('/api/v1/export/json', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `captureos-export-${new Date().toISOString().slice(0,10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    alert('导出失败')
+  }
+}
+
 onMounted(async () => {
   try {
     const [s, t, st, sg] = await Promise.allSettled([
@@ -46,3 +67,11 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style>
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+</style>

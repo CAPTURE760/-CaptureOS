@@ -14,6 +14,8 @@ import dailyLogs from './routes/daily-logs.js'
 import timeRecords from './routes/time-records.js'
 import timeline from './routes/timeline.js'
 import risk from './routes/risk.js'
+import exportRoutes from './routes/export.js'
+import { startBackupScheduler } from './lib/backup.js'
 
 const app = new Hono()
 
@@ -45,8 +47,12 @@ app.route('/api/v1/daily-logs', dailyLogs)
 app.route('/api/v1/time-records', timeRecords)
 app.route('/api/v1/timeline', timeline)
 app.route('/api/v1/risk', risk)
+app.route('/api/v1/export', exportRoutes)
 
 const port = Number(process.env.PORT || 8000)
 console.log(`🚀 CaptureOS API 启动在 http://localhost:${port}`)
 
 serve({ fetch: app.fetch, port })
+
+// 启动自动备份调度
+startBackupScheduler()

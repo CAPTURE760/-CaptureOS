@@ -1,14 +1,17 @@
 <template>
   <div style="display: flex; height: 100vh">
+    <!-- Mobile overlay -->
+    <div v-if="sidebarOpen" @click="sidebarOpen = false" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99; display: none" class="mobile-overlay"></div>
+
     <!-- 侧边栏 -->
-    <div style="width: 220px; background: #16213e; overflow-y: auto; flex-shrink: 0">
+    <div :style="sidebarStyle" :class="{ open: sidebarOpen }" class="sidebar">
       <div style="padding: 20px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06)">
         <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #e94560, #c0392b); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff">C</div>
         <span style="font-size: 18px; font-weight: 700; color: #e0e0e0">CaptureOS</span>
       </div>
       <div style="padding: 8px">
         <div v-for="item in menuItems" :key="item.path"
-          @click="$router.push(item.path)"
+          @click="$router.push(item.path); sidebarOpen = false"
           :style="{ padding: '12px 16px', borderRadius: '8px', cursor: 'pointer', color: route.path === item.path ? '#e94560' : '#a0aec0', background: route.path === item.path ? 'rgba(233,69,96,0.15)' : 'transparent', marginBottom: '4px' }"
         >
           {{ item.label }}
@@ -20,8 +23,11 @@
     <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden">
       <!-- 顶栏 -->
       <div style="height: 60px; background: #1a1a2e; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0">
-        <span style="font-size: 16px; color: #a0aec0">CaptureOS</span>
-        <span style="color: #a0aec0; cursor: pointer" @click="logout">{{ userStore.username || '用户' }} ▾</span>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span style="font-size: 24px; cursor: pointer; display: none" class="hamburger" @click="sidebarOpen = !sidebarOpen">&#9776;</span>
+          <span style="font-size: 16px; color: #a0aec0">CaptureOS</span>
+        </div>
+        <span style="color: #a0aec0; cursor: pointer" @click="logout">{{ userStore.username || '用户' }} &#9662;</span>
       </div>
       <!-- 内容区 -->
       <div style="flex: 1; background: #0d1117; padding: 20px; overflow-y: auto">
@@ -32,11 +38,21 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
 const route = useRoute()
 const userStore = useUserStore()
+const sidebarOpen = ref(false)
+
+const sidebarStyle = computed(() => ({
+  width: '220px',
+  background: '#16213e',
+  overflowY: 'auto',
+  flexShrink: '0',
+  transition: 'transform 0.3s ease',
+}))
 
 const menuItems = [
   { path: '/', label: '🏠 驾驶舱' },
@@ -55,3 +71,29 @@ function logout() {
   userStore.logout()
 }
 </script>
+
+<style>
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .hamburger {
+    display: inline-block !important;
+  }
+  .mobile-overlay {
+    display: block !important;
+  }
+  .table-wrapper {
+    overflow-x: auto;
+  }
+}
+</style>

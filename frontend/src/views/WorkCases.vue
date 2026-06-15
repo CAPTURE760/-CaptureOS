@@ -9,8 +9,15 @@
       <button @click="openDialog()" style="padding: 8px 16px; background: #e94560; border: none; border-radius: 6px; color: #fff; cursor: pointer">新增</button>
     </div>
 
+    <!-- 加载中 -->
+    <div v-if="loading" style="text-align: center; padding: 40px; color: #a0aec0">
+      <div style="display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite"></div>
+      <div style="margin-top: 8px">加载中...</div>
+    </div>
+    <div v-else-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
+
     <!-- 表格 -->
-    <div style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
+    <div v-else class="table-wrapper" style="background: #161b22; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden">
       <table style="width: 100%; border-collapse: collapse">
         <thead>
           <tr style="background: #1a1a2e">
@@ -36,7 +43,6 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="!list.length" style="padding: 40px; text-align: center; color: #a0aec0">暂无数据</div>
     </div>
 
     <!-- 分页 -->
@@ -54,6 +60,7 @@
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">标题 *</label>
             <input v-model="form.title" placeholder="案例标题" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e0e0e0; box-sizing: border-box" />
+            <div v-if="errors.title" style="color: #e94560; font-size: 12px; margin-top: 4px">{{ errors.title }}</div>
           </div>
           <div>
             <label style="display: block; color: #a0aec0; margin-bottom: 6px; font-size: 14px">医院名称</label>
@@ -106,6 +113,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 20
 const editId = ref<number | string | null>(null)
+const errors = ref<Record<string, string>>({})
 
 const form = ref({
   title: '',
@@ -124,6 +132,12 @@ function formatTags(tags: any): string {
   return arr.map((t: string) => t.trim()).filter(Boolean).join(', ')
 }
 
+function validate(): boolean {
+  errors.value = {}
+  if (!form.value.title?.trim()) errors.value.title = '请输入标题'
+  return Object.keys(errors.value).length === 0
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -134,13 +148,14 @@ async function loadData() {
     list.value = d.items ?? d ?? []
     total.value = d.total ?? 0
   } catch (err: any) {
-    alert(err?.data?.message || '加载失败')
+    // 加载失败静默处理
   } finally {
     loading.value = false
   }
 }
 
 function openDialog(row?: any) {
+  errors.value = {}
   if (row) {
     editId.value = row.id
     form.value = {
@@ -161,10 +176,7 @@ function openDialog(row?: any) {
 }
 
 async function handleSave() {
-  if (!form.value.title.trim()) {
-    alert('请输入标题')
-    return
-  }
+  if (!validate()) return
   saving.value = true
   try {
     const data = {
@@ -179,7 +191,7 @@ async function handleSave() {
     showDialog.value = false
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '保存失败')
+    // 保存失败静默处理
   } finally {
     saving.value = false
   }
@@ -191,7 +203,7 @@ async function handleDelete(id: number | string) {
     await workCasesApi.remove(id)
     loadData()
   } catch (err: any) {
-    alert(err?.data?.message || '删除失败')
+    // 删除失败静默处理
   }
 }
 
