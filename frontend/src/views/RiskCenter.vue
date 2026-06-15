@@ -84,8 +84,8 @@ onMounted(async () => {
   loading.value = true
   try {
     const [statusRes, alertsRes] = await Promise.all([
-      riskApi.getStatus(),
-      riskApi.getAlerts(),
+      riskApi.status(),
+      riskApi.alerts(),
     ])
     riskStatus.value = (statusRes as any) ?? {}
     alerts.value = (alertsRes as any) ?? []

@@ -62,7 +62,7 @@
 import { ref, h, onMounted } from 'vue'
 import {
   NButton, NDataTable, NPagination, NModal, NForm, NFormItem,
-  NInput, NDatePicker, NSelect, NPopconfirm, NSpace, useMessage,
+  NInput, NDatePicker, NSelect, NPopconfirm, useMessage,
 } from 'naive-ui'
 import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
 import { dailyLogsApi } from '../api'

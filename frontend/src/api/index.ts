@@ -3,13 +3,11 @@ import router from '../router'
 
 const api = ofetch.create({
   baseURL: '/api/v1',
-  onRequest({ options }) {
+  onRequest({ options }: any) {
     const token = localStorage.getItem('token')
     if (token) {
-      options.headers = {
-        ...options.headers,
-        Authorization: `Bearer ${token}`,
-      }
+      options.headers = options.headers || {}
+      options.headers.Authorization = `Bearer ${token}`
     }
   },
   onResponseError({ response }) {
