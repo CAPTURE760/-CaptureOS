@@ -1,0 +1,36 @@
+services:
+  backend:
+    build: ./backend
+    container_name: captureos-backend
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/captureos.db
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    container_name: captureos-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  nginx:
+    build: ./nginx
+    container_name: captureos-nginx
+    restart: unless-stopped
+    ports:
+      - "3080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
